@@ -21,6 +21,7 @@ interface AuthContextType {
   isManager: boolean;
   isLoading: boolean;
   needsOrgSelection: boolean;
+  can: (permission: string) => boolean;
 }
 
 const ORG_STORAGE_KEY = "mc_current_org";
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   isManager: false,
   isLoading: true,
   needsOrgSelection: false,
+  can: () => false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -80,6 +82,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.users.currentMember,
     selectedOrgId ? { orgId: selectedOrgId as Id<"organizations"> } : "skip"
   );
+
+  // ── Permissions for the member's role ───────────────────────────────────
+  // Role names in the members table are lowercase, roles table uses capitalized
+  const roleName = memberDoc?.role
+    ? memberDoc.role.charAt(0).toUpperCase() + memberDoc.role.slice(1)
+    : null;
+  const permissions = useQuery(
+    api.permissions.getMemberPermissions,
+    selectedOrgId && roleName
+      ? { orgId: selectedOrgId as Id<"organizations">, roleName }
+      : "skip"
+  ) ?? [];
+
+  const can = (permission: string): boolean => {
+    if (!memberDoc) return false;
+    // Admins can always do everything
+    if (memberDoc.role === "admin") return true;
+    return permissions.includes(permission);
+  };
 
   // ── Derived state ────────────────────────────────────────────────────────
   const isLoading = convexLoading || (isAuthenticated && (email === undefined || (email !== null && orgsRaw === undefined)));
@@ -162,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isManager: user?.role === "manager",
       isLoading,
       needsOrgSelection: needsOrg,
+      can,
     }}>
       {content}
     </AuthContext.Provider>

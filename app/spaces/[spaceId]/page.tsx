@@ -1245,8 +1245,9 @@ function BulkImportSection({
 export default function SpaceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isAdmin, isManager, orgId } = useAuth();
+  const { user, isAdmin, isManager, orgId, can } = useAuth();
   const { t } = useLocale();
+  const canCreateProject = can("project.create");
 
   const spaceId = params.spaceId as Id<"spaces">;
 
@@ -1361,7 +1362,7 @@ export default function SpaceDetailPage() {
                 {activeProjects.length === 0 && !addingProject ? (
                   <div style={{ textAlign: "center", padding: "80px 20px" }}>
                     <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 6px" }}>{t.spaceDetailPage.noProjectsYet}</p>
-                    {(isAdmin || isManager) && (
+                    {canCreateProject && (
                       <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0 }}>
                         {t.spaceDetailPage.addProjectHint}
                       </p>
@@ -1386,7 +1387,7 @@ export default function SpaceDetailPage() {
                 )}
 
                 {/* Add Project button */}
-                {(isAdmin || isManager) && !addingProject && (
+                {canCreateProject && !addingProject && (
                   <button
                     onClick={() => setAddingProject(true)}
                     style={{
