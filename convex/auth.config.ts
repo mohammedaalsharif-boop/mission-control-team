@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://honorable-hornet-795.convex.site",
+      domain: process.env.NEXT_PUBLIC_CONVEX_SITE_URL,
       applicationID: "convex",
     },
   ],
