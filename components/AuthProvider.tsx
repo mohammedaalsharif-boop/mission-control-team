@@ -124,8 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── Render decision ──────────────────────────────────────────────────────
   let content: ReactNode;
 
-  if (pathname === "/login") {
-    // Login page always renders normally
+  if (pathname === "/login" || pathname === "/invite") {
+    // Login and invite pages always render normally
     content = children;
   } else if (isLoading || !isAuthenticated) {
     // Show spinner while loading or before redirect to /login
