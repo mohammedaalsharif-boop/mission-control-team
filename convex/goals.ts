@@ -44,12 +44,15 @@ export const getGoalProjects = query({
         const project = await ctx.db.get(link.projectId);
         if (!project) return null;
 
-        const tasks = await ctx.db
+        // Stream and count instead of collecting all tasks into memory
+        let total = 0;
+        let completed = 0;
+        for await (const t of ctx.db
           .query("tasks")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .take(500);
-        const total     = tasks.length;
-        const completed = tasks.filter((t) => t.status === "completed").length;
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))) {
+          total++;
+          if (t.status === "completed") completed++;
+        }
 
         return {
           link,
@@ -90,12 +93,13 @@ export const getProgress = query({
     let completedTasks = 0;
 
     for (const link of links) {
-      const tasks = await ctx.db
+      // Stream and count instead of collecting all tasks into memory
+      for await (const t of ctx.db
         .query("tasks")
-        .withIndex("by_project", (q) => q.eq("projectId", link.projectId))
-        .take(500);
-      totalTasks     += tasks.length;
-      completedTasks += tasks.filter((t) => t.status === "completed").length;
+        .withIndex("by_project", (q) => q.eq("projectId", link.projectId))) {
+        totalTasks++;
+        if (t.status === "completed") completedTasks++;
+      }
     }
 
     return {

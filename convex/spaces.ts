@@ -12,11 +12,21 @@ export const list = query({
     includeArchived: v.optional(v.boolean()),
   },
   handler: async (ctx, { orgId, includeArchived }) => {
-    const all = await ctx.db
+    if (includeArchived) {
+      return ctx.db
+        .query("spaces")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .take(200);
+    }
+    // Stream and filter out archived spaces
+    const result = [];
+    for await (const s of ctx.db
       .query("spaces")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-    return includeArchived ? all : all.filter((s) => !s.archivedAt);
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))) {
+      if (!s.archivedAt) result.push(s);
+      if (result.length >= 200) break;
+    }
+    return result;
   },
 });
 

@@ -9,12 +9,17 @@ export const listAdminNotifications = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await getCallerMember(ctx, orgId);
-    const all = await ctx.db
+    // Use compound index to fetch only admin notifications directly
+    const result = [];
+    for await (const n of ctx.db
       .query("notifications")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .order("desc")
-      .take(100);
-    return all.filter((n) => n.forRole === "admin");
+      .withIndex("by_org_and_role_and_read", (q) =>
+        q.eq("orgId", orgId).eq("forRole", "admin"))
+      .order("desc")) {
+      result.push(n);
+      if (result.length >= 100) break;
+    }
+    return result;
   },
 });
 
@@ -38,11 +43,15 @@ export const countUnreadAdmin = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await getCallerMember(ctx, orgId);
-    const all = await ctx.db
+    // Use compound index to count only unread admin notifications
+    let count = 0;
+    for await (const _ of ctx.db
       .query("notifications")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-    return all.filter((n) => n.forRole === "admin" && !n.read).length;
+      .withIndex("by_org_and_role_and_read", (q) =>
+        q.eq("orgId", orgId).eq("forRole", "admin").eq("read", false))) {
+      count++;
+    }
+    return count;
   },
 });
 
@@ -53,11 +62,15 @@ export const countUnreadMember = query({
     const member = await ctx.db.get(memberId);
     if (!member) return 0;
     if (member.orgId) await getCallerMember(ctx, member.orgId);
-    const all = await ctx.db
+    // Use compound index to count only unread member notifications
+    let count = 0;
+    for await (const _ of ctx.db
       .query("notifications")
-      .withIndex("by_member", (q) => q.eq("forMemberId", memberId))
-      .collect();
-    return all.filter((n) => !n.read).length;
+      .withIndex("by_member_and_read", (q) =>
+        q.eq("forMemberId", memberId).eq("read", false))) {
+      count++;
+    }
+    return count;
   },
 });
 
@@ -81,16 +94,26 @@ export const markAllRead = mutation({
   },
   handler: async (ctx, { orgId, role, memberId }) => {
     await getCallerMember(ctx, orgId);
-    const all = memberId
-      ? await ctx.db.query("notifications").withIndex("by_member", (q) => q.eq("forMemberId", memberId)).collect()
-      : await ctx.db.query("notifications").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
 
-    const unread = memberId
-      ? all.filter((n) => !n.read)
-      : all.filter((n) => n.forRole === role && !n.read);
-
-    for (const n of unread) {
-      await ctx.db.patch(n._id, { read: true });
+    // Use compound indexes to fetch only unread notifications directly
+    if (memberId) {
+      const unread = await ctx.db
+        .query("notifications")
+        .withIndex("by_member_and_read", (q) =>
+          q.eq("forMemberId", memberId).eq("read", false))
+        .take(500);
+      for (const n of unread) {
+        await ctx.db.patch(n._id, { read: true });
+      }
+    } else {
+      const unread = await ctx.db
+        .query("notifications")
+        .withIndex("by_org_and_role_and_read", (q) =>
+          q.eq("orgId", orgId).eq("forRole", role).eq("read", false))
+        .take(500);
+      for (const n of unread) {
+        await ctx.db.patch(n._id, { read: true });
+      }
     }
   },
 });

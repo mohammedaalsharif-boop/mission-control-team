@@ -14,7 +14,7 @@ export const listAll = query({
     ctx.db
       .query("projects")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect(),
+      .take(200),
 });
 
 // List all projects in a space (access-aware)
@@ -25,14 +25,13 @@ export const listBySpace = query({
   },
   handler: async (ctx, { spaceId, viewerId }) => {
     const viewer   = await ctx.db.get(viewerId);
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
-      .collect();
-
     if (!viewer) return [];
+
     if (viewer.role === "admin" || viewer.role === "manager") {
-      return projects;
+      return ctx.db
+        .query("projects")
+        .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+        .take(200);
     }
 
     const memberships = await ctx.db
@@ -40,7 +39,15 @@ export const listBySpace = query({
       .withIndex("by_member", (q) => q.eq("memberId", viewerId))
       .collect();
     const accessible = new Set(memberships.map((m) => m.projectId));
-    return projects.filter((p) => accessible.has(p._id));
+
+    const result = [];
+    for await (const p of ctx.db
+      .query("projects")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))) {
+      if (accessible.has(p._id)) result.push(p);
+      if (result.length >= 200) break;
+    }
+    return result;
   },
 });
 
@@ -52,14 +59,13 @@ export const listForViewer = query({
   },
   handler: async (ctx, { orgId, viewerId }) => {
     const viewer = await ctx.db.get(viewerId);
-    const all    = await ctx.db
-      .query("projects")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-
     if (!viewer) return [];
+
     if (viewer.role === "admin" || viewer.role === "manager") {
-      return all;
+      return ctx.db
+        .query("projects")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .take(200);
     }
 
     const memberships = await ctx.db
@@ -67,7 +73,15 @@ export const listForViewer = query({
       .withIndex("by_member", (q) => q.eq("memberId", viewerId))
       .collect();
     const accessible = new Set(memberships.map((m) => m.projectId));
-    return all.filter((p) => accessible.has(p._id));
+
+    const result = [];
+    for await (const p of ctx.db
+      .query("projects")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))) {
+      if (accessible.has(p._id)) result.push(p);
+      if (result.length >= 200) break;
+    }
+    return result;
   },
 });
 
@@ -112,17 +126,21 @@ export const listMembers = query({
 export const getStats = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
-    const tasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .collect();
+    // Stream and count instead of collecting all tasks into memory
+    let total = 0;
+    let completed = 0;
+    let inProgress = 0;
+    let overdue = 0;
+    const rightNow = Date.now();
 
-    const total      = tasks.length;
-    const completed  = tasks.filter((t) => t.status === "completed").length;
-    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
-    const overdue    = tasks.filter(
-      (t) => t.dueDate && t.dueDate < Date.now() && t.status !== "completed"
-    ).length;
+    for await (const t of ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))) {
+      total++;
+      if (t.status === "completed") completed++;
+      else if (t.status === "in_progress") inProgress++;
+      if (t.dueDate && t.dueDate < rightNow && t.status !== "completed") overdue++;
+    }
 
     return { total, completed, inProgress, overdue };
   },

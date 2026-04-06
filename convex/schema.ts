@@ -160,7 +160,9 @@ export default defineSchema({
     .index("by_role",    ["forRole"])
     .index("by_read",    ["read"])
     .index("by_created", ["createdAt"])
-    .index("by_org",     ["orgId"]),
+    .index("by_org",     ["orgId"])
+    .index("by_org_and_role_and_read", ["orgId", "forRole", "read"])
+    .index("by_member_and_read", ["forMemberId", "read"]),
 
   // ── Settings (scoped to an org) ───────────────────────────────────────────────
   settings: defineTable({

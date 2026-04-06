@@ -18,19 +18,22 @@ export const getById = query({
 export const getTaskMeta = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {
-    const subtasks = await ctx.db
+    // Count subtasks without collecting entire arrays into memory
+    let subtaskTotal = 0;
+    let subtaskDone = 0;
+    for await (const s of ctx.db
       .query("subtasks")
-      .withIndex("by_task", (q) => q.eq("taskId", taskId))
-      .collect();
-    const comments = await ctx.db
+      .withIndex("by_task", (q) => q.eq("taskId", taskId))) {
+      subtaskTotal++;
+      if (s.status === "completed") subtaskDone++;
+    }
+    let commentCount = 0;
+    for await (const _ of ctx.db
       .query("comments")
-      .withIndex("by_taskId", (q) => q.eq("taskId", taskId))
-      .collect();
-    return {
-      subtaskTotal: subtasks.length,
-      subtaskDone:  subtasks.filter((s) => s.status === "completed").length,
-      commentCount: comments.length,
-    };
+      .withIndex("by_taskId", (q) => q.eq("taskId", taskId))) {
+      commentCount++;
+    }
+    return { subtaskTotal, subtaskDone, commentCount };
   },
 });
 
@@ -41,7 +44,7 @@ export const listAllTasks = query({
       .query("tasks")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .order("desc")
-      .collect(),
+      .take(500),
 });
 
 export const listByProject = query({
@@ -51,7 +54,7 @@ export const listByProject = query({
       .query("tasks")
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .order("desc")
-      .collect(),
+      .take(500),
 });
 
 export const listAllTasksForViewer = query({
@@ -63,14 +66,17 @@ export const listAllTasksForViewer = query({
     const viewer = await ctx.db.get(viewerId);
     if (!viewer) return [];
 
-    const all = await ctx.db
-      .query("tasks")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .order("desc")
-      .collect();
+    // Admins and managers see everything — cap at 500
+    if (viewer.role === "admin" || viewer.role === "manager") {
+      return ctx.db
+        .query("tasks")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .order("desc")
+        .take(500);
+    }
 
-    if (viewer.role === "admin" || viewer.role === "manager") return all;
-
+    // For regular members, build access sets first, then collect
+    // only the tasks they can actually see.
     const memberships = await ctx.db
       .query("projectMembers")
       .withIndex("by_member", (q) => q.eq("memberId", viewerId))
@@ -83,12 +89,23 @@ export const listAllTasksForViewer = query({
       .collect();
     const grantedTaskIds = new Set(grants.map((g) => g.taskId));
 
-    return all.filter((t) => {
-      if (grantedTaskIds.has(t._id)) return true;
-      if (t.memberId === viewerId) return true;
-      if (t.projectId && !accessibleProjects.has(t.projectId)) return false;
-      return !t.visibility || t.visibility === "public";
-    });
+    // Stream through tasks and collect only visible ones, up to 500
+    const result = [];
+    for await (const t of ctx.db
+      .query("tasks")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .order("desc")) {
+      if (
+        grantedTaskIds.has(t._id) ||
+        t.memberId === viewerId ||
+        ((!t.projectId || accessibleProjects.has(t.projectId)) &&
+          (!t.visibility || t.visibility === "public"))
+      ) {
+        result.push(t);
+      }
+      if (result.length >= 500) break;
+    }
+    return result;
   },
 });
 
@@ -101,13 +118,14 @@ export const listByProjectForViewer = query({
     const viewer = await ctx.db.get(viewerId);
     if (!viewer) return [];
 
-    const tasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .order("desc")
-      .collect();
-
-    if (viewer.role === "admin" || viewer.role === "manager") return tasks;
+    // Admins/managers see all tasks in the project
+    if (viewer.role === "admin" || viewer.role === "manager") {
+      return ctx.db
+        .query("tasks")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .order("desc")
+        .take(500);
+    }
 
     const grants = await ctx.db
       .query("taskAccess")
@@ -115,13 +133,22 @@ export const listByProjectForViewer = query({
       .collect();
     const grantedIds = new Set(grants.map((g) => g.taskId));
 
-    return tasks.filter(
-      (t) =>
+    const result = [];
+    for await (const t of ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .order("desc")) {
+      if (
         t.memberId === viewerId ||
         grantedIds.has(t._id) ||
         !t.visibility ||
         t.visibility === "public"
-    );
+      ) {
+        result.push(t);
+      }
+      if (result.length >= 500) break;
+    }
+    return result;
   },
 });
 
@@ -132,7 +159,7 @@ export const listTasksByMember = query({
       .query("tasks")
       .withIndex("by_member", (q) => q.eq("memberId", memberId))
       .order("desc")
-      .collect(),
+      .take(500),
 });
 
 export const listTasksByStatus = query({
@@ -145,19 +172,25 @@ export const listTasksByStatus = query({
       .query("tasks")
       .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", status))
       .order("desc")
-      .collect();
+      .take(500);
   },
 });
 
 export const listApprovalHistory = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    const all = await ctx.db
+    // Stream through tasks and pick only those with approval history, up to 200
+    const result = [];
+    for await (const t of ctx.db
       .query("tasks")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .order("desc")
-      .collect();
-    return all.filter((t) => t.approvedAt != null || t.rejectedAt != null);
+      .order("desc")) {
+      if (t.approvedAt != null || t.rejectedAt != null) {
+        result.push(t);
+      }
+      if (result.length >= 200) break;
+    }
+    return result;
   },
 });
 
@@ -478,13 +511,13 @@ export const approveAllSubmitted = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await requireAdminOrManager(ctx, orgId);
-    const all = await ctx.db
+    // Use the status index directly instead of fetching all tasks
+    const submitted = await ctx.db
       .query("tasks")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-    const submitted = all.filter((t) => t.status === "submitted");
+      .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", "submitted"))
+      .take(100);
 
-    for (const task of submitted.slice(0, 100)) {
+    for (const task of submitted) {
       await ctx.db.patch(task._id, {
         status:     "completed",
         approvedAt: now(),

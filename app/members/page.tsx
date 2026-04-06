@@ -7,7 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/components/AuthProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import Sidebar from "@/components/Sidebar";
-import { UserPlus, Trash2, Shield, User, Mail, XCircle } from "lucide-react";
+import { UserPlus, Trash2, Shield, User, Mail, XCircle, Link2, Check } from "lucide-react";
 
 export default function MembersPage() {
   const { isAdmin, isLoading, orgId } = useAuth();
@@ -27,6 +27,14 @@ export default function MembersPage() {
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
   const [loading,   setLoading]   = useState(false);
+  const [copiedId,  setCopiedId]  = useState<string | null>(null);
+
+  const copyInviteLink = async (token: string, inviteId: string) => {
+    const url = `${window.location.origin}/invite?token=${token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(inviteId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const pendingInvites = invites.filter((inv: any) => inv.status === "pending" && inv.expiresAt > Date.now());
 
@@ -181,6 +189,20 @@ export default function MembersPage() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{inv.name}</span>
                       <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>{inv.email}</span>
                     </div>
+                    <button
+                      onClick={() => copyInviteLink(inv.token, inv._id)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                        background: copiedId === inv._id ? "rgba(34,197,94,0.12)" : "var(--surface2)",
+                        color: copiedId === inv._id ? "var(--status-success, #22c55e)" : "var(--text-muted)",
+                        border: copiedId === inv._id ? "1px solid rgba(34,197,94,0.3)" : "1px solid var(--border2)",
+                        cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: 4,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {copiedId === inv._id ? <><Check size={10} /> {"Copied!"}</> : <><Link2 size={10} /> {"Copy Link"}</>}
+                    </button>
                     <button
                       onClick={async () => { if (orgId) try { await resendInvite({ orgId, inviteId: inv._id }); } catch {} }}
                       style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: "var(--surface2)", color: "var(--text-muted)", border: "1px solid var(--border2)", cursor: "pointer" }}
