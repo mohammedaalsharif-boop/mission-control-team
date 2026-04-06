@@ -59,6 +59,33 @@ export async function requireAdmin(ctx: Ctx, orgId?: Id<"organizations">) {
 }
 
 /**
+ * Throws unless the caller has the specified permission in the given org.
+ * Admins always pass. For other roles, checks the roles table.
+ */
+export async function requirePermission(
+  ctx: Ctx,
+  orgId: Id<"organizations">,
+  permission: string,
+) {
+  const member = await getCallerMember(ctx, orgId);
+  // Admins bypass all permission checks
+  if (member.role === "admin") return member;
+
+  // Look up the role in the roles table (capitalize first letter to match)
+  const roleName = member.role.charAt(0).toUpperCase() + member.role.slice(1);
+  const role = await ctx.db
+    .query("roles")
+    .withIndex("by_org_and_name", (q) => q.eq("orgId", orgId).eq("name", roleName))
+    .first();
+
+  if (role && role.permissions.includes(permission)) {
+    return member;
+  }
+
+  throw new Error(`Permission denied. You need the "${permission}" permission.`);
+}
+
+/**
  * Verifies that the caller belongs to the same org as the given record.
  * For legacy records with no orgId, allows access to any authenticated user.
  * Returns the record if access is allowed, throws otherwise.

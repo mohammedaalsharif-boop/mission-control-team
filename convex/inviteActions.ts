@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getCallerMember, requireAdmin } from "./helpers";
+import { getCallerMember, requireAdmin, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 const INVITE_EXPIRY_DAYS = 7;
@@ -25,7 +25,7 @@ export const createInvite = mutation({
     role:  v.optional(v.string()),
   },
   handler: async (ctx, { orgId, name, email, role }) => {
-    const admin = await requireAdmin(ctx, orgId);
+    const admin = await requirePermission(ctx, orgId, "member.invite");
     const normalised = email.trim().toLowerCase();
 
     // Check if already a member
@@ -204,7 +204,7 @@ export const revokeInvite = mutation({
     inviteId: v.id("invites"),
   },
   handler: async (ctx, { orgId, inviteId }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "member.invite");
     const invite = await ctx.db.get(inviteId);
     if (!invite) throw new Error("Invite not found.");
     if (invite.orgId !== orgId) throw new Error("Invite does not belong to this organization.");
@@ -219,7 +219,7 @@ export const resendInvite = mutation({
     inviteId: v.id("invites"),
   },
   handler: async (ctx, { orgId, inviteId }) => {
-    const admin = await requireAdmin(ctx, orgId);
+    const admin = await requirePermission(ctx, orgId, "member.invite");
     const invite = await ctx.db.get(inviteId);
     if (!invite) throw new Error("Invite not found.");
     if (invite.orgId !== orgId) throw new Error("Invite does not belong to this organization.");

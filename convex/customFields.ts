@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCallerMember, requireAdminOrManager } from "./helpers";
+import { getCallerMember, requireAdminOrManager, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -44,7 +44,7 @@ export const createDef = mutation({
     createdBy: v.id("members"),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrManager(ctx, args.orgId);
+    await requirePermission(ctx, args.orgId, "custom_field.create");
 
     if (!VALID_FIELD_TYPES.includes(args.fieldType)) {
       throw new Error(`Invalid field type "${args.fieldType}". Must be one of: ${VALID_FIELD_TYPES.join(", ")}`);
@@ -82,7 +82,7 @@ export const updateDef = mutation({
   handler: async (ctx, { fieldId, ...fields }) => {
     const def = await ctx.db.get(fieldId);
     if (!def) throw new Error("Field definition not found");
-    await requireAdminOrManager(ctx, def.orgId);
+    await requirePermission(ctx, def.orgId, "custom_field.edit");
 
     const patch: Record<string, unknown> = {};
     if (fields.name      !== undefined) patch.name      = fields.name.trim();
@@ -99,7 +99,7 @@ export const deleteDef = mutation({
   handler: async (ctx, { fieldId }) => {
     const def = await ctx.db.get(fieldId);
     if (!def) throw new Error("Field definition not found");
-    await requireAdminOrManager(ctx, def.orgId);
+    await requirePermission(ctx, def.orgId, "custom_field.delete");
 
     // Delete all values for this field
     const values = await ctx.db

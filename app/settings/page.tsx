@@ -1374,11 +1374,11 @@ type TabId = "team" | "permissions" | "automations" | "custom_fields" | "workspa
 
 export default function SettingsPage() {
   const { t } = useLocale();
-  const { isAdmin, isLoading } = useAuth();
+  const { isLoading, can } = useAuth();
   const [tab, setTab] = useState<TabId>("team");
 
   if (isLoading) return null;
-  if (!isAdmin) return (
+  if (!can("settings.edit")) return (
     <div className="flex h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">

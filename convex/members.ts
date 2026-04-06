@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCallerMember, requireAdmin, requireSameOrg } from "./helpers";
+import { getCallerMember, requireAdmin, requirePermission, requireSameOrg } from "./helpers";
 
 const now = () => Date.now();
 
@@ -62,7 +62,7 @@ export const removeMember = mutation({
     memberId: v.id("members"),
   },
   handler: async (ctx, { orgId, memberId }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "member.remove");
     const member = await ctx.db.get(memberId);
     if (!member) throw new Error("Member not found");
     if (member.orgId !== orgId) throw new Error("Member does not belong to this organization.");
@@ -115,7 +115,7 @@ export const updateMemberRole = mutation({
     role:     v.string(),
   },
   handler: async (ctx, { orgId, memberId, role }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "member.role_change");
     const member = await ctx.db.get(memberId);
     if (!member) throw new Error("Member not found");
     if (member.orgId !== orgId) throw new Error("Member does not belong to this organization.");

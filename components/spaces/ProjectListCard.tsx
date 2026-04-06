@@ -376,7 +376,7 @@ interface ProjectListCardProps {
 
 export default function ProjectListCard({ project, spaceName }: ProjectListCardProps) {
   const router       = useRouter();
-  const { isAdmin, isManager, orgId } = useAuth();
+  const { orgId, can } = useAuth();
   const { t, locale } = useLocale();
   const tasks        = useQuery(api.tasks.listByProject, { projectId: project._id }) ?? [];
   const members      = useQuery(api.members.listMembers, orgId ? { orgId } : "skip") ?? [];
@@ -393,7 +393,7 @@ export default function ProjectListCard({ project, spaceName }: ProjectListCardP
   const [renameName,     setRenameName]     = useState(project.name);
   const [linkCopied,     setLinkCopied]     = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
-  const canEdit = isAdmin || isManager;
+  const canEdit = can("project.edit");
 
   const handleRename = async () => {
     const trimmed = renameName.trim();

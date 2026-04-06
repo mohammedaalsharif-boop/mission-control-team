@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { requireAdminOrManager, requireAdmin, getCallerMember, requireSameOrg } from "./helpers";
+import { requireAdminOrManager, requireAdmin, getCallerMember, requireSameOrg, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -372,7 +372,8 @@ export const approveTask = mutation({
   handler: async (ctx, { taskId }) => {
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
-    await requireAdminOrManager(ctx, task.orgId);
+    if (!task.orgId) throw new Error("Task has no organization");
+    await requirePermission(ctx, task.orgId, "task.approve");
 
     await ctx.db.patch(taskId, {
       status:     "completed",
@@ -425,7 +426,8 @@ export const rejectTask = mutation({
   handler: async (ctx, { taskId, reason }) => {
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
-    await requireAdminOrManager(ctx, task.orgId);
+    if (!task.orgId) throw new Error("Task has no organization");
+    await requirePermission(ctx, task.orgId, "task.approve");
 
     await ctx.db.patch(taskId, {
       status:          "in_progress",
@@ -510,7 +512,7 @@ export const updateTask = mutation({
 export const approveAllSubmitted = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await requireAdminOrManager(ctx, orgId);
+    await requirePermission(ctx, orgId, "task.approve");
     // Use the status index directly instead of fetching all tasks
     const submitted = await ctx.db
       .query("tasks")
@@ -554,13 +556,9 @@ export const deleteTask = mutation({
   handler: async (ctx, { taskId }) => {
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
-    const caller = await getCallerMember(ctx, task.orgId);
+    if (!task.orgId) throw new Error("Task has no organization");
 
-    const isAdminOrManager = caller.role === "admin" || caller.role === "manager";
-
-    if (!isAdminOrManager) {
-      throw new Error("Only admins and managers can delete tasks.");
-    }
+    await requirePermission(ctx, task.orgId, "task.delete");
 
     await ctx.db.delete(taskId);
     return taskId;

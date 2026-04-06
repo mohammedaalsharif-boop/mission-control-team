@@ -385,7 +385,7 @@ function ProjectCard({
   project:   Pick<Doc<"projects">, "_id" | "name" | "status"> & { estimatedCompletionDate?: number; ownerId?: string; supporterId?: string };
   spaceName: string;
 }) {
-  const { isAdmin, isManager, orgId } = useAuth();
+  const { orgId, can } = useAuth();
   const { t, locale } = useLocale();
   const tasks         = useQuery(api.tasks.listByProject, orgId ? { projectId: project._id } : "skip") ?? [];
   const members       = useQuery(api.members.listMembers, orgId ? { orgId } : "skip") ?? [];
@@ -446,7 +446,7 @@ function ProjectCard({
     await updateStatus({ taskId: taskId as Id<"tasks">, status: toStatus });
   };
 
-  const canEdit = isAdmin || isManager;
+  const canEdit = can("project.edit");
 
   return (
     <div style={{
@@ -1245,7 +1245,7 @@ function BulkImportSection({
 export default function SpaceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isAdmin, isManager, orgId, can } = useAuth();
+  const { user, orgId, can } = useAuth();
   const { t } = useLocale();
   const canCreateProject = can("project.create");
 

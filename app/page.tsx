@@ -30,7 +30,9 @@ const getPriorityOptions = (t: any) => [
 const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", submissionDate: "", visibility: "public", assigneeId: "", assigneeName: "" };
 
 export default function Dashboard() {
-  const { user, isAdmin, isLoading, orgId } = useAuth();
+  const { user, isLoading, orgId, can } = useAuth();
+  const canApproveTask = can("task.approve");
+  const canAssignTask  = can("task.assign");
   const { t } = useLocale();
 
   const allTasks = useQuery(
@@ -152,8 +154,8 @@ export default function Dashboard() {
   const handleAdd = async (colId: string) => {
     if (!form.title.trim() || !orgId) return;
     if (!form.submissionDate) return; // Due date is mandatory
-    const assigneeId   = (isAdmin && form.assigneeId)   ? form.assigneeId   : user.memberId;
-    const assigneeName = (isAdmin && form.assigneeName) ? form.assigneeName : user.name;
+    const assigneeId   = (canAssignTask && form.assigneeId)   ? form.assigneeId   : user.memberId;
+    const assigneeName = (canAssignTask && form.assigneeName) ? form.assigneeName : user.name;
     const taskId = await createTask({
       orgId,
       title:          form.title.trim(),
@@ -512,7 +514,7 @@ export default function Dashboard() {
             projects={projects}
             tasks={visible.map(toTeamTask)}
             spaces={spaces}
-            isAdmin={isAdmin}
+            isAdmin={canApproveTask}
             currentUserId={user.memberId}
             onAddTask={(projectId, statusId) => { setAddingCol("draft"); setForm(EMPTY_FORM); setView("kanban"); }}
             onSubmit={(id) => submitTask({ taskId: id as Id<"tasks"> })}
@@ -576,7 +578,7 @@ export default function Dashboard() {
                       </button>
                     )}
                     {/* Admin: show pending count on Submitted */}
-                    {col.id === "submitted" && isAdmin && colItems.length > 0 && (
+                    {col.id === "submitted" && canApproveTask && colItems.length > 0 && (
                       <span style={{
                         fontSize: 9.5, fontWeight: 700,
                         background: "var(--status-warning)", color: "#000",
@@ -727,7 +729,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Assign to (admin only) */}
-                        {isAdmin && members.length > 0 && (
+                        {canAssignTask && members.length > 0 && (
                           <select
                             value={form.assigneeId || user.memberId}
                             onChange={(e) => {
@@ -809,7 +811,7 @@ export default function Dashboard() {
                         <TaskCard
                           key={t._id}
                           task={toTeamTask(t)}
-                          isAdmin={isAdmin}
+                          isAdmin={canApproveTask}
                           isOwn={t.memberId === user.memberId}
                           currentUser={{ memberId: user.memberId, name: user.name }}
                           onDelete={(id) => deleteTask({ taskId: id as Id<"tasks"> })}

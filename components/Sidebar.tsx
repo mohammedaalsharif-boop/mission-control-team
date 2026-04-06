@@ -470,11 +470,12 @@ function SpacesTree({
   favorites: ReturnType<typeof useFavorites>;
 }) {
   const { t } = useLocale();
-  const { user, isAdmin, isManager, orgId } = useAuth();
+  const { user, isAdmin, orgId, can } = useAuth();
   const pathname = usePathname();
 
   const spaces   = useQuery(api.spaces.list, orgId ? { orgId } : "skip") ?? [];
-  const allSpaces = useQuery(api.spaces.list, isAdmin && orgId ? { orgId, includeArchived: true } : "skip") ?? [];
+  const canArchiveSpaces = can("space.archive");
+  const allSpaces = useQuery(api.spaces.list, canArchiveSpaces && orgId ? { orgId, includeArchived: true } : "skip") ?? [];
   const archivedSpaces = allSpaces.filter((s) => s.archivedAt);
   const projects = useQuery(
     api.projects.listForViewer,
@@ -544,8 +545,8 @@ function SpacesTree({
 
   const toggleSpace   = (id: string) => setCollapsed((c) => ({ ...c, [id]: !c[id] }));
   const toggleExpand  = (id: string) => setExpanded((c) => ({ ...c, [id]: !c[id] }));
-  const canEditProjects = isAdmin || isManager;
-  const canManageSpaces = isAdmin;
+  const canEditProjects = can("project.create");
+  const canManageSpaces = can("space.edit");
 
   // Determine which space contains the active project (auto-expand)
   const activeProjectId = pathname.startsWith("/projects/") ? pathname.split("/")[2] : null;
@@ -789,8 +790,8 @@ function SpacesTree({
 //  Notification Panel
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function NotificationPanel({ isAdmin, memberId, onClose, orgId }: {
-  isAdmin: boolean; memberId: string; onClose: () => void; orgId: Id<"organizations"> | null;
+function NotificationPanel({ isAdmin, memberId, onClose, orgId, canApprove }: {
+  isAdmin: boolean; memberId: string; onClose: () => void; orgId: Id<"organizations"> | null; canApprove?: boolean;
 }) {
   const { t } = useLocale();
   const router   = useRouter();
@@ -932,7 +933,7 @@ function NotificationPanel({ isAdmin, memberId, onClose, orgId }: {
                 </div>
                 {group.items.map((n) => {
                   const meta = TYPE_META[n.type] ?? { icon: "\ud83d\udd14", accent: "var(--text-muted)" };
-                  const isSubmission = n.type === "task_submitted" && isAdmin;
+                  const isSubmission = n.type === "task_submitted" && (canApprove ?? isAdmin);
                   return (
                     <div
                       key={n._id}
@@ -1069,7 +1070,7 @@ function NotificationPanel({ isAdmin, memberId, onClose, orgId }: {
 export default function Sidebar() {
   const { t } = useLocale();
   const pathname = usePathname();
-  const { user, logout, isAdmin, isManager, orgId, orgs, switchOrg } = useAuth();
+  const { user, logout, isAdmin, orgId, orgs, switchOrg, can } = useAuth();
   const { theme, toggle } = useTheme();
   const { signOut } = useAuthActions();
 
@@ -1111,10 +1112,10 @@ export default function Sidebar() {
 
   // Admin/manager tools — shown as compact icons in footer dock
   const adminTools = [
-    { href: "/approvals", label: t.nav.approvals, icon: CheckSquare,  show: isAdmin || isManager },
-    { href: "/members",   label: "Members",       icon: Users,        show: isAdmin              },
-    { href: "/analytics", label: t.nav.analytics, icon: TrendingUp,   show: isAdmin || isManager },
-    { href: "/settings",  label: t.nav.settings,  icon: Settings,     show: isAdmin              },
+    { href: "/approvals", label: t.nav.approvals, icon: CheckSquare,  show: can("task.approve")   },
+    { href: "/members",   label: "Members",       icon: Users,        show: can("member.invite") || can("member.remove") },
+    { href: "/analytics", label: t.nav.analytics, icon: TrendingUp,   show: can("task.approve")   },
+    { href: "/settings",  label: t.nav.settings,  icon: Settings,     show: can("settings.edit")  },
   ].filter((l) => l.show);
 
   // Combined for Quick Switcher (keep all pages searchable via Cmd+K)
@@ -1126,8 +1127,8 @@ export default function Sidebar() {
   // Build switcher items
   const switcherItems = useMemo<SwitcherItem[]>(() => {
     const items: SwitcherItem[] = [];
-    // Pages — only visible to admins/managers in the switcher
-    if (isAdmin || isManager) {
+    // Pages — only visible to users with admin tools access in the switcher
+    if (adminTools.length > 0) {
       for (const l of links) {
         items.push({ id: `page-${l.href}`, label: l.label, href: l.href, icon: "page", section: "Pages" });
       }
@@ -1156,7 +1157,7 @@ export default function Sidebar() {
       items.push({ id: `space-${s._id}`, label: s.name, href: `/spaces/${s._id}`, icon: "space", section: "Spaces" });
     }
     return items;
-  }, [links, projects, spaces, favorites, isAdmin, isManager]);
+  }, [links, projects, spaces, favorites, adminTools]);
 
   // Close org switcher on outside click
   useEffect(() => {
@@ -1875,7 +1876,7 @@ export default function Sidebar() {
 
       {showCreateSpace && <CreateSpaceModal onClose={() => setShowCreateSpace(false)} />}
       {showNotifPanel && user && (
-        <NotificationPanel isAdmin={isAdmin} memberId={user.memberId} onClose={() => setShowNotifPanel(false)} orgId={orgId} />
+        <NotificationPanel isAdmin={isAdmin} memberId={user.memberId} onClose={() => setShowNotifPanel(false)} orgId={orgId} canApprove={can("task.approve")} />
       )}
       {showSwitcher && <QuickSwitcher onClose={() => setShowSwitcher(false)} items={switcherItems} />}
     </>

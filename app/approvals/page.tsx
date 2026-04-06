@@ -481,7 +481,7 @@ function HistoryTab({ t, locale }: { t: any; locale: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ApprovalsPage() {
-  const { isAdmin, isManager, isLoading, orgId } = useAuth();
+  const { isLoading, orgId, can } = useAuth();
   const { t, locale } = useLocale();
   const [tab, setTab] = useState<"pending" | "history">("pending");
 
@@ -489,7 +489,7 @@ export default function ApprovalsPage() {
   const pendingCount = (useQuery(api.tasks.listTasksByStatus, pendingCountArgs) ?? []).length;
 
   if (isLoading) return null;
-  if (!isAdmin && !isManager) return (
+  if (!can("task.approve")) return (
     <div className="flex h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">

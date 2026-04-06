@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { getCallerMember, requireAdminOrManager } from "./helpers";
+import { getCallerMember, requireAdminOrManager, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -61,7 +61,7 @@ export const create = mutation({
     createdBy:    v.id("members"),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrManager(ctx, args.orgId);
+    await requirePermission(ctx, args.orgId, "automation.create");
 
     if (!args.name.trim()) throw new Error("Automation name is required.");
 
@@ -93,7 +93,7 @@ export const update = mutation({
   handler: async (ctx, { automationId, ...fields }) => {
     const auto = await ctx.db.get(automationId);
     if (!auto) throw new Error("Automation not found");
-    await requireAdminOrManager(ctx, auto.orgId);
+    await requirePermission(ctx, auto.orgId, "automation.edit");
 
     const patch: Record<string, unknown> = { updatedAt: now() };
     for (const [k, val] of Object.entries(fields)) {
@@ -108,7 +108,7 @@ export const remove = mutation({
   handler: async (ctx, { automationId }) => {
     const auto = await ctx.db.get(automationId);
     if (!auto) throw new Error("Automation not found");
-    await requireAdminOrManager(ctx, auto.orgId);
+    await requirePermission(ctx, auto.orgId, "automation.delete");
     await ctx.db.delete(automationId);
   },
 });

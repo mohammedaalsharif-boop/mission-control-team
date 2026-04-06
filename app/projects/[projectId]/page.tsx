@@ -56,7 +56,7 @@ function MembersPanel({
   onClose: () => void;
 }) {
   const { t } = useLocale();
-  const { isAdmin, isManager, orgId } = useAuth();
+  const { orgId, can } = useAuth();
   const members         = useQuery(api.members.listMembers, orgId ? { orgId } : "skip") ?? [];
   const projectMembersArgs = orgId ? { projectId } : "skip" as const;
   const projectMembers  = useQuery(api.projects.listMembers, projectMembersArgs) ?? [];
@@ -108,7 +108,7 @@ function MembersPanel({
                 <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", margin: 0 }}>{m.name}</p>
                 <p style={{ fontSize: 10, color: "var(--text-muted)", margin: 0 }}>{m.role}</p>
               </div>
-              {(isAdmin || isManager) && m.role !== "admin" && (
+              {can("member.remove") && m.role !== "admin" && (
                 <button
                   onClick={() => removeMember({ projectId, memberId: m._id })}
                   style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
@@ -121,7 +121,7 @@ function MembersPanel({
         </div>
 
         {/* Add members */}
-        {(isAdmin || isManager) && nonMembers.length > 0 && (
+        {can("member.invite") && nonMembers.length > 0 && (
           <div>
             <p style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
               {t.projectPage.addMembers}
@@ -329,7 +329,8 @@ export default function ProjectPage() {
   const { t, locale } = useLocale();
   const params = useParams();
   const router = useRouter();
-  const { user, isAdmin, isManager, orgId } = useAuth();
+  const { user, orgId, can } = useAuth();
+  const canApproveTask = can("task.approve");
 
   const projectId = params.projectId as Id<"projects">;
 
@@ -440,7 +441,7 @@ export default function ProjectPage() {
     if (!taskId) return;
     const task = tasks.find((t) => t._id === taskId);
     if (!task || task.status === colId) return;
-    const canMove = isAdmin || isManager || task.memberId === user.memberId;
+    const canMove = can("task.edit") || task.memberId === user.memberId;
     if (!canMove) return;
     await moveTask({ taskId: task._id as Id<"tasks">, status: colId });
   };
@@ -530,14 +531,14 @@ export default function ProjectPage() {
                 label={t.projectPage.owner}
                 selectedId={(project as any).ownerId}
                 members={members}
-                canEdit={isAdmin || isManager}
+                canEdit={can("project.edit")}
                 onSelect={(id) => updateProject({ projectId, ownerId: id ? id as Id<"members"> : undefined })}
               />
               <UserPicker
                 label={t.projectPage.supporter}
                 selectedId={(project as any).supporterId}
                 members={members}
-                canEdit={isAdmin || isManager}
+                canEdit={can("project.edit")}
                 onSelect={(id) => updateProject({ projectId, supporterId: id ? id as Id<"members"> : undefined })}
               />
             </div>
@@ -571,7 +572,7 @@ export default function ProjectPage() {
             {(() => {
               const ecd = (project as any).estimatedCompletionDate as number | undefined;
               const isOverdueProject = ecd && ecd < Date.now() && progress < 100;
-              if (!ecd && !(isAdmin || isManager)) return null;
+              if (!ecd && !can("project.edit")) return null;
               return (
                 <>
                   <div style={{ width: 1, height: 28, background: "var(--border)", margin: "0 24px" }} />
@@ -595,11 +596,11 @@ export default function ProjectPage() {
                       />
                     ) : (
                       <p
-                        onClick={() => (isAdmin || isManager) && setEditingECD(true)}
+                        onClick={() => can("project.edit") && setEditingECD(true)}
                         style={{
                           fontSize: 14, fontWeight: 700, margin: 0, lineHeight: 1.2,
                           color: isOverdueProject ? "var(--status-danger)" : "var(--text)",
-                          cursor: (isAdmin || isManager) ? "pointer" : "default",
+                          cursor: can("project.edit") ? "pointer" : "default",
                           display: "flex", alignItems: "center", gap: 4,
                         }}
                       >
@@ -731,7 +732,7 @@ export default function ProjectPage() {
                   "{project.northStar}"
                 </span>
               </div>
-              {(isAdmin || isManager) && (
+              {can("project.edit") && (
                 <button
                   onClick={() => { setNorthStarDraft(project.northStar ?? ""); setNorthStarOpen(true); }}
                   title="Edit North Star"
@@ -747,7 +748,7 @@ export default function ProjectPage() {
                 </button>
               )}
             </div>
-          ) : (isAdmin || isManager) ? (
+          ) : can("project.edit") ? (
             <button
               onClick={() => { setNorthStarDraft(""); setNorthStarOpen(true); }}
               style={{
@@ -935,7 +936,7 @@ export default function ProjectPage() {
         {view === "list" && (
           <ListView
             tasks={visible.map(toTeamTask)}
-            isAdmin={isAdmin}
+            isAdmin={canApproveTask}
             currentUserId={user.memberId}
             triggerAddStatus={listTrigger}
             onTriggerConsumed={() => setListTrigger(null)}
@@ -1084,7 +1085,7 @@ export default function ProjectPage() {
                       <TaskCard
                         key={task._id}
                         task={toTeamTask(task)}
-                        isAdmin={isAdmin}
+                        isAdmin={canApproveTask}
                         isOwn={task.memberId === user.memberId}
                         currentUser={user}
                         onSubmit={(id) => submitTask({ taskId: id as Id<"tasks"> })}

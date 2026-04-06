@@ -15,7 +15,7 @@ import { useState, useCallback } from "react";
 export default function TaskPermalinkPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const router = useRouter();
-  const { user, isAdmin, isManager, orgId } = useAuth();
+  const { user, orgId, can } = useAuth();
   const { t, locale } = useLocale();
 
   const task = useQuery(api.tasks.getById, { taskId: taskId as Id<"tasks"> });
@@ -206,7 +206,7 @@ export default function TaskPermalinkPage() {
           <div style={{ width: "100%", maxWidth: 720 }}>
             <TaskModal
               task={teamTask}
-              isAdmin={isAdmin || isManager}
+              isAdmin={can("task.approve")}
               isOwn={isOwn}
               currentUser={{ memberId: user?.memberId ?? "", name: user?.name ?? "" }}
               onClose={() => {

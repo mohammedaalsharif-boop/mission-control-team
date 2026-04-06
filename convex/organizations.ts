@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { getCallerMember, requireAdmin } from "./helpers";
+import { getCallerMember, requireAdmin, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -116,7 +116,7 @@ export const update = mutation({
     name:  v.optional(v.string()),
   },
   handler: async (ctx, { orgId, name }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "settings.edit");
     const patch: Record<string, unknown> = {};
     if (name !== undefined) patch.name = name.trim();
     await ctx.db.patch(orgId, patch);

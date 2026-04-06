@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAdmin, requireSameOrg } from "./helpers";
+import { requireAdmin, requireSameOrg, requirePermission } from "./helpers";
 import { internal } from "./_generated/api";
 
 const now = () => Date.now();
@@ -52,7 +52,7 @@ export const create = mutation({
     createdBy:   v.id("members"),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx, args.orgId);
+    await requirePermission(ctx, args.orgId, "space.create");
     const spaceId = await ctx.db.insert("spaces", {
       orgId:       args.orgId,
       name:        args.name.trim(),
@@ -86,7 +86,7 @@ export const update = mutation({
     icon:        v.optional(v.string()),
   },
   handler: async (ctx, { orgId, spaceId, ...fields }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "space.edit");
     const patch: Record<string, unknown> = {};
     if (fields.name        !== undefined) patch.name        = fields.name.trim();
     if (fields.description !== undefined) patch.description = fields.description;
@@ -104,7 +104,7 @@ export const archive = mutation({
     archive: v.boolean(),
   },
   handler: async (ctx, { orgId, spaceId, archive }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "space.archive");
     await ctx.db.patch(spaceId, { archivedAt: archive ? now() : undefined });
   },
 });
@@ -117,7 +117,7 @@ export const deleteSpace = mutation({
     spaceId: v.id("spaces"),
   },
   handler: async (ctx, { orgId, spaceId }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "space.delete");
 
     // Start cascade: schedule the internal batch-delete worker
     await ctx.scheduler.runAfter(0, internal.spaces.deleteSpaceBatch, {

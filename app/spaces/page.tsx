@@ -33,7 +33,7 @@ function SpaceCard({
   t: any;
 }) {
   const router = useRouter();
-  const { isAdmin, isManager } = useAuth();
+  const { can } = useAuth();
 
   return (
     <div
@@ -83,7 +83,7 @@ function SpaceCard({
           </div>
         </div>
 
-        {(isAdmin || isManager) && (
+        {can("space.edit") && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             style={{
@@ -261,7 +261,7 @@ function NewSpaceModal({ onClose, t }: { onClose: () => void; t: any }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SpacesPage() {
-  const { user, isAdmin, isManager, orgId } = useAuth();
+  const { user, orgId, can } = useAuth();
   const { t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -305,7 +305,7 @@ export default function SpacesPage() {
               {t.spacesPage.subtitle}
             </p>
           </div>
-          {(isAdmin || isManager) && (
+          {can("space.create") && (
             <button
               onClick={() => setShowNewSpace(true)}
               style={{
@@ -328,7 +328,7 @@ export default function SpacesPage() {
             <FolderOpen size={40} style={{ margin: "0 auto 16px", opacity: 0.3 }} />
             <p style={{ margin: "0 0 4px", fontWeight: 600 }}>{t.spacesPage.noSpacesYet}</p>
             <p style={{ margin: 0, fontSize: 12 }}>
-              {(isAdmin || isManager)
+              {can("space.create")
                 ? t.spacesPage.createFirstSpace
                 : t.spacesPage.noSpacesCreated}
             </p>

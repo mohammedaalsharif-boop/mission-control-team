@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCallerMember, requireAdminOrManager } from "./helpers";
+import { getCallerMember, requireAdminOrManager, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -125,7 +125,7 @@ export const create = mutation({
     createdBy:   v.id("members"),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrManager(ctx, args.orgId);
+    await requirePermission(ctx, args.orgId, "goal.create");
     return ctx.db.insert("goals", {
       orgId:        args.orgId,
       title:        args.title.trim(),
@@ -160,7 +160,7 @@ export const update = mutation({
   handler: async (ctx, { goalId, ...fields }) => {
     const goal = await ctx.db.get(goalId);
     if (!goal) throw new Error("Goal not found");
-    await requireAdminOrManager(ctx, goal.orgId);
+    await requirePermission(ctx, goal.orgId, "goal.edit");
 
     const patch: Record<string, unknown> = { updatedAt: now() };
     for (const [k, val] of Object.entries(fields)) {
@@ -175,7 +175,7 @@ export const remove = mutation({
   handler: async (ctx, { goalId }) => {
     const goal = await ctx.db.get(goalId);
     if (!goal) throw new Error("Goal not found");
-    await requireAdminOrManager(ctx, goal.orgId);
+    await requirePermission(ctx, goal.orgId, "goal.delete");
 
     // Remove all project links
     const links = await ctx.db

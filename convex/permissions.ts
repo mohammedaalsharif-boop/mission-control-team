@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCallerMember, requireAdmin } from "./helpers";
+import { getCallerMember, requireAdmin, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -105,7 +105,7 @@ export const createRole = mutation({
     permissions: v.array(v.string()),
   },
   handler: async (ctx, { orgId, name, permissions }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "settings.edit");
 
     if (!name.trim()) throw new Error("Role name is required.");
 
@@ -137,7 +137,7 @@ export const updateRole = mutation({
   handler: async (ctx, { roleId, ...fields }) => {
     const role = await ctx.db.get(roleId);
     if (!role) throw new Error("Role not found");
-    await requireAdmin(ctx, role.orgId);
+    await requirePermission(ctx, role.orgId, "settings.edit");
 
     // Can't rename system roles
     if (role.isSystem && fields.name && fields.name !== role.name) {
@@ -157,7 +157,7 @@ export const deleteRole = mutation({
   handler: async (ctx, { roleId }) => {
     const role = await ctx.db.get(roleId);
     if (!role) throw new Error("Role not found");
-    await requireAdmin(ctx, role.orgId);
+    await requirePermission(ctx, role.orgId, "settings.edit");
     if (role.isSystem) throw new Error("Cannot delete system roles.");
     await ctx.db.delete(roleId);
   },

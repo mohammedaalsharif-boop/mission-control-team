@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCallerMember, requireAdmin } from "./helpers";
+import { getCallerMember, requireAdmin, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -37,7 +37,7 @@ export const setSetting = mutation({
     value: v.string(),
   },
   handler: async (ctx, { orgId, key, value }) => {
-    await requireAdmin(ctx, orgId);
+    await requirePermission(ctx, orgId, "settings.edit");
     const existing = await ctx.db
       .query("settings")
       .withIndex("by_org_and_key", (q) => q.eq("orgId", orgId).eq("key", key))

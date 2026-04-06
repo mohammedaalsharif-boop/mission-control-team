@@ -1102,7 +1102,7 @@ function Card({ children, style: extraStyle }: { children: React.ReactNode; styl
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function AnalyticsPage() {
-  const { isAdmin, isManager, isLoading, orgId } = useAuth();
+  const { isLoading, orgId, can } = useAuth();
   const { t, locale } = useLocale();
   const CATEGORY_META = getCategoryMeta(t);
   const membersArgs = orgId ? { orgId } : "skip" as const;
@@ -1348,7 +1348,7 @@ export default function AnalyticsPage() {
     </div>
   );
 
-  if (!isAdmin && !isManager) return (
+  if (!can("task.approve")) return (
     <div className="flex h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">

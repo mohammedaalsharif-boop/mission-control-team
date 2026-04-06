@@ -10,7 +10,7 @@ import Sidebar from "@/components/Sidebar";
 import { UserPlus, Trash2, Shield, User, Mail, XCircle, Link2, Check } from "lucide-react";
 
 export default function MembersPage() {
-  const { isAdmin, isLoading, orgId } = useAuth();
+  const { isLoading, orgId, can } = useAuth();
   const { t } = useLocale();
   const membersArgs = orgId ? { orgId } : "skip" as const;
   const members      = useQuery(api.members.listMembers, membersArgs) ?? [];
@@ -39,7 +39,7 @@ export default function MembersPage() {
   const pendingInvites = invites.filter((inv: any) => inv.status === "pending" && inv.expiresAt > Date.now());
 
   if (isLoading) return null;
-  if (!isAdmin) return (
+  if (!can("member.invite") && !can("member.remove")) return (
     <div className="flex h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">
