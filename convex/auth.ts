@@ -1,6 +1,6 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
-import Resend from "@auth/core/providers/resend";
+// import Resend from "@auth/core/providers/resend";  // TODO: re-enable when Resend is configured
 import { DataModel } from "./_generated/dataModel";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
@@ -21,12 +21,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           throw new Error("Password must contain at least one number.");
         }
       },
-      // ── Email verification via Resend OTP ───────────────────────────────
-      verify: Resend({
-        id: "resend-otp",
-        apiKey: process.env.AUTH_RESEND_KEY,
-        from: process.env.AUTH_EMAIL_FROM ?? "Mission Control <noreply@yourdomain.com>",
-      }),
+      // TODO: Re-enable email verification when Resend is configured
+      // verify: Resend({
+      //   id: "resend-otp",
+      //   apiKey: process.env.AUTH_RESEND_KEY,
+      //   from: process.env.AUTH_EMAIL_FROM ?? "Mission Control <noreply@yourdomain.com>",
+      // }),
     }),
   ],
 
