@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mission Control — Hierarchy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e4e4e7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 80px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #71717a;
+    margin-bottom: 48px;
+    font-weight: 400;
+  }
+
+  /* ─── Tree layout ─── */
+  .tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  /* Connector lines */
+  .connector {
+    width: 2px;
+    background: linear-gradient(to bottom, var(--from, #6366f1), var(--to, #6366f1));
+    opacity: 0.35;
+  }
+  .connector-short { height: 32px; }
+  .connector-med   { height: 28px; }
+
+  /* Horizontal fan-out */
+  .fan {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    position: relative;
+    width: 100%;
+  }
+  .fan::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 2px;
+    background: var(--line-color, #6366f1);
+    opacity: 0.25;
+    left: var(--left);
+    right: var(--right);
+  }
+
+  .fan-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ─── Cards ─── */
+  .card {
+    border-radius: 16px;
+    padding: 20px 28px;
+    text-align: center;
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: default;
+    width: 100%;
+    max-width: var(--max-w, 340px);
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--glow);
+  }
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+    font-size: 20px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 4px;
+  }
+  .card-desc {
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.7;
+    font-weight: 400;
+  }
+  .card-when {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  /* ─── Level-specific styles ─── */
+  .org {
+    background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+    border: 1.5px solid rgba(99,102,241,0.25);
+    --glow: 0 8px 30px rgba(99,102,241,0.15);
+  }
+  .org .card-icon { background: rgba(99,102,241,0.15); }
+  .org .card-title { color: #818cf8; }
+  .org .card-when { background: rgba(99,102,241,0.08); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.15); }
+
+  .space {
+    background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04));
+    border: 1.5px solid rgba(139,92,246,0.25);
+    --glow: 0 8px 30px rgba(139,92,246,0.15);
+    --max-w: 240px;
+  }
+  .space .card-icon { background: rgba(139,92,246,0.15); }
+  .space .card-title { color: #a78bfa; }
+  .space .card-when { background: rgba(139,92,246,0.08); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.12); }
+
+  .project {
+    background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04));
+    border: 1.5px solid rgba(59,130,246,0.25);
+    --glow: 0 8px 30px rgba(59,130,246,0.15);
+    --max-w: 200px;
+  }
+  .project .card-icon { background: rgba(59,130,246,0.15); }
+  .project .card-title { color: #60a5fa; }
+  .project .card-when { background: rgba(59,130,246,0.08); color: #93c5fd; border: 1px solid rgba(59,130,246,0.12); }
+
+  .task {
+    background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04));
+    border: 1.5px solid rgba(34,197,94,0.25);
+    --glow: 0 8px 30px rgba(34,197,94,0.15);
+    --max-w: 200px;
+  }
+  .task .card-icon { background: rgba(34,197,94,0.15); }
+  .task .card-title { color: #4ade80; }
+  .task .card-when { background: rgba(34,197,94,0.08); color: #86efac; border: 1px solid rgba(34,197,94,0.12); }
+
+  .subtask {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04));
+    border: 1.5px solid rgba(245,158,11,0.25);
+    --glow: 0 8px 30px rgba(245,158,11,0.15);
+    --max-w: 200px;
+  }
+  .subtask .card-icon { background: rgba(245,158,11,0.15); }
+  .subtask .card-title { color: #fbbf24; }
+  .subtask .card-when { background: rgba(245,158,11,0.08); color: #fcd34d; border: 1px solid rgba(245,158,11,0.12); }
+
+  /* ─── Arrow label between levels ─── */
+  .level-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin: 4px 0;
+  }
+  .level-label.contains {
+    background: rgba(255,255,255,0.05);
+    color: #71717a;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 700px) {
+    .fan { flex-direction: column; align-items: center; gap: 12px; }
+    .fan::before { display: none; }
+    .card { --max-w: 300px !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Mission Control Hierarchy</h1>
+<p class="subtitle">How your workspace is structured — from top to bottom</p>
+
+<div class="tree">
+
+  <!-- ═══ ORGANIZATION ═══ -->
+  <div class="card org" style="--max-w: 400px;">
+    <div class="card-icon">🏢</div>
+    <div class="card-title">Organization</div>
+    <div class="card-desc">Your team's top-level workspace. All members, spaces, and data live here.</div>
+    <div class="card-when">
+      ✦ Create when setting up a new team or company<br/>
+      ✦ Most teams only need one
+    </div>
+  </div>
+
+  <div class="connector connector-short" style="--from: #6366f1; --to: #8b5cf6;"></div>
+  <div class="level-label contains">contains</div>
+  <div class="connector connector-med" style="--from: #8b5cf6; --to: #8b5cf6;"></div>
+
+  <!-- ═══ SPACES ═══ -->
+  <div class="fan" style="--line-color: #8b5cf6; --left: 18%; --right: 18%;">
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #8b5cf6; --to: #8b5cf6;"></div>
+      <div class="card space">
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">Space</div>
+        <div class="card-desc">A department or area of work</div>
+        <div class="card-when">
+          ✦ e.g. "Operations", "Marketing"<br/>
+          ✦ Create for each major area
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #8b5cf6; --to: #8b5cf6;"></div>
+      <div class="card space">
+        <div class="card-icon">📢</div>
+        <div class="card-title">Space</div>
+        <div class="card-desc">A different team or function</div>
+        <div class="card-when">
+          ✦ e.g. "Engineering", "Design"<br/>
+          ✦ Separate members & projects
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #8b5cf6; --to: #8b5cf6;"></div>
+      <div class="card space">
+        <div class="card-icon">💰</div>
+        <div class="card-title">Space</div>
+        <div class="card-desc">Another area of responsibility</div>
+        <div class="card-when">
+          ✦ e.g. "Finance", "HR"<br/>
+          ✦ 2–5 spaces is typical
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector connector-short" style="--from: #8b5cf6; --to: #3b82f6;"></div>
+  <div class="level-label contains">contains</div>
+  <div class="connector connector-med" style="--from: #3b82f6; --to: #3b82f6;"></div>
+
+  <!-- ═══ PROJECTS ═══ -->
+  <div class="fan" style="--line-color: #3b82f6; --left: 25%; --right: 25%;">
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #3b82f6; --to: #3b82f6;"></div>
+      <div class="card project">
+        <div class="card-icon">📋</div>
+        <div class="card-title">Project</div>
+        <div class="card-desc">A focused initiative with a goal</div>
+        <div class="card-when">
+          ✦ e.g. "Website Redesign"<br/>
+          ✦ Has owner, timeline, tasks
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #3b82f6; --to: #3b82f6;"></div>
+      <div class="card project">
+        <div class="card-icon">🚀</div>
+        <div class="card-title">Project</div>
+        <div class="card-desc">Another workstream or campaign</div>
+        <div class="card-when">
+          ✦ e.g. "Q2 Launch"<br/>
+          ✦ Create per initiative
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector connector-short" style="--from: #3b82f6; --to: #22c55e;"></div>
+  <div class="level-label contains">contains</div>
+  <div class="connector connector-med" style="--from: #22c55e; --to: #22c55e;"></div>
+
+  <!-- ═══ TASKS ═══ -->
+  <div class="fan" style="--line-color: #22c55e; --left: 20%; --right: 20%;">
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #22c55e; --to: #22c55e;"></div>
+      <div class="card task">
+        <div class="card-icon">✅</div>
+        <div class="card-title">Task</div>
+        <div class="card-desc">A piece of work someone does</div>
+        <div class="card-when">
+          ✦ e.g. "Write homepage copy"<br/>
+          ✦ Has assignee, status, priority
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #22c55e; --to: #22c55e;"></div>
+      <div class="card task">
+        <div class="card-icon">✅</div>
+        <div class="card-title">Task</div>
+        <div class="card-desc">Another actionable work item</div>
+        <div class="card-when">
+          ✦ e.g. "Setup analytics"<br/>
+          ✦ Flows: draft → done
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #22c55e; --to: #22c55e;"></div>
+      <div class="card task">
+        <div class="card-icon">✅</div>
+        <div class="card-title">Task</div>
+        <div class="card-desc">Every discrete piece of work</div>
+        <div class="card-when">
+          ✦ e.g. "Design banner"<br/>
+          ✦ Tracked individually
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector connector-short" style="--from: #22c55e; --to: #f59e0b;"></div>
+  <div class="level-label contains">optionally contains</div>
+  <div class="connector connector-med" style="--from: #f59e0b; --to: #f59e0b;"></div>
+
+  <!-- ═══ SUBTASKS ═══ -->
+  <div class="fan" style="--line-color: #f59e0b; --left: 30%; --right: 30%;">
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #f59e0b; --to: #f59e0b;"></div>
+      <div class="card subtask">
+        <div class="card-icon">📌</div>
+        <div class="card-title">Subtask</div>
+        <div class="card-desc">A smaller step inside a task</div>
+        <div class="card-when">
+          ✦ e.g. "Gather brand assets"<br/>
+          ✦ Use when a task has multiple steps
+        </div>
+      </div>
+    </div>
+    <div class="fan-col">
+      <div class="connector connector-med" style="--from: #f59e0b; --to: #f59e0b;"></div>
+      <div class="card subtask">
+        <div class="card-icon">📌</div>
+        <div class="card-title">Subtask</div>
+        <div class="card-desc">Another checklist item</div>
+        <div class="card-when">
+          ✦ e.g. "Get lead approval"<br/>
+          ✦ Optional — only if needed
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

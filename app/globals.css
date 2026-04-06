@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Dark theme (default) ── */
+:root {
+  --bg:         #0f0f0f;
+  --surface:    #141414;
+  --surface2:   #1a1a1a;
+  --surface3:   #1e1e1e;
+  --border:     #222222;
+  --border2:    #2a2a2a;
+  --border3:    #333333;
+  --text:       #e8e8e8;
+  --text-muted: #71717a;
+  --text-dim:   #3f3f46;
+
+  /* Semantic accent colors */
+  --accent:        #6366f1;
+  --accent-light:  #818cf8;
+  --accent-bg:     rgba(99,102,241,0.15);
+  --accent-border: rgba(99,102,241,0.3);
+  --accent-muted:  rgba(99,102,241,0.4);
+  --accent-subtle: rgba(99,102,241,0.08);
+
+  /* Status colors */
+  --status-success: #22c55e;
+  --status-warning: #f59e0b;
+  --status-danger:  #ef4444;
+  --status-info:    #3b82f6;
+  --status-neutral: #71717a;
+}
+
+/* ── Light theme ── */
+html.light {
+  --bg:         #f4f4f5;
+  --surface:    #ffffff;
+  --surface2:   #f9f9f9;
+  --surface3:   #f0f0f0;
+  --border:     #e4e4e7;
+  --border2:    #d4d4d8;
+  --border3:    #a1a1aa;
+  --text:       #18181b;
+  --text-muted: #71717a;
+  --text-dim:   #a1a1aa;
+}
+
+html.light body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* Sidebar now uses CSS variables natively — no light-mode overrides needed */
+
+html.light .topbar {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+html.light .task-card {
+  background-color: var(--surface) !important;
+  border-color: var(--border2) !important;
+}
+
+html.light .task-card:hover {
+  background-color: var(--surface2) !important;
+  border-color: var(--border3) !important;
+}
+
+html.light .col-empty {
+  border-color: var(--border) !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-fadeIn { animation: fadeIn 0.2s ease both; }
+
+/* Card entrance — staggered per card via nth-child */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.task-card {
+  animation: cardIn 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.task-card:nth-child(1)  { animation-delay: 0ms; }
+.task-card:nth-child(2)  { animation-delay: 30ms; }
+.task-card:nth-child(3)  { animation-delay: 60ms; }
+.task-card:nth-child(4)  { animation-delay: 90ms; }
+.task-card:nth-child(5)  { animation-delay: 120ms; }
+.task-card:nth-child(6)  { animation-delay: 150ms; }
+.task-card:nth-child(7)  { animation-delay: 180ms; }
+.task-card:nth-child(8)  { animation-delay: 210ms; }
+.task-card:nth-child(9)  { animation-delay: 240ms; }
+.task-card:nth-child(10) { animation-delay: 270ms; }
+
+/* Notification badge pulse */
+@keyframes notifPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(99,102,241,0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(99,102,241,0); }
+  100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+}
+
+.sb-notif-dot {
+  animation: notifPulse 2s ease-in-out infinite;
+}
+
+/* ── RTL support ── */
+html[dir="rtl"] body {
+  font-family: 'Noto Sans Arabic', var(--font-inter, 'Inter'), system-ui, sans-serif;
+  text-align: right;
+}
+
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select {
+  text-align: right;
+}
+
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="url"] {
+  text-align: left;
+  direction: ltr;
+}
+
+/* Flip chevron-like icons in RTL */
+html[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
