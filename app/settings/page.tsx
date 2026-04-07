@@ -9,7 +9,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import Sidebar from "@/components/Sidebar";
 import {
   Users, Shield, Settings, UserPlus, Trash2, Plus,
-  ChevronDown, Check, Bell, Globe, Lock,
+  ChevronDown, Check, Bell, Globe, Lock, Link2,
   CheckCircle, XCircle, BarChart2, Mail, Zap, Sliders,
 } from "lucide-react";
 
@@ -271,6 +271,19 @@ function TeamTab() {
                   <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>{inv.email}</span>
                 </div>
                 <RoleBadge role={inv.role} />
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/invite?token=${inv.token}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      setSuccess(t.teamTab.linkCopied);
+                      setTimeout(() => setSuccess(""), 2000);
+                    });
+                  }}
+                  style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10.5, fontWeight: 600, background: "var(--accent-bg)", color: "var(--accent-light)", border: "1px solid rgba(99,102,241,0.3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                  title="Copy invite link"
+                >
+                  <Link2 size={10} /> {t.teamTab.copyLink}
+                </button>
                 <button
                   onClick={async () => { if (orgId) try { await resendInvite({ orgId, inviteId: inv._id }); } catch {} }}
                   style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10.5, fontWeight: 600, background: "var(--surface3)", color: "var(--text-muted)", border: "1px solid var(--border2)", cursor: "pointer" }}

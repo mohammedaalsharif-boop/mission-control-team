@@ -377,6 +377,8 @@ const ar: Translations = {
     doneLabel: "منجز",
     rateLabel: "النسبة",
     removeMember: "إزالة العضو",
+    copyLink: "نسخ الرابط",
+    linkCopied: "تم نسخ رابط الدعوة!",
   },
 
   // ── Settings: Permissions Tab ──────────────────────────────────────

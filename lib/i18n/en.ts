@@ -376,6 +376,8 @@ const en = {
     doneLabel: "Done",
     rateLabel: "Rate",
     removeMember: "Remove member",
+    copyLink: "Copy Link",
+    linkCopied: "Invite link copied!",
   },
 
   // ── Settings: Permissions Tab ──────────────────────────────────────
