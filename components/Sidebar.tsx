@@ -1236,7 +1236,7 @@ export default function Sidebar() {
           background: var(--surface3);
         }
         .sb-search-trigger-text {
-          flex: 1; font-size: 12.5px; color: var(--text-dim);
+          flex: 1; font-size: 12.5px; color: var(--text-muted);
           letter-spacing: -0.005em;
         }
         .sb-search-trigger:hover .sb-search-trigger-text { color: var(--text-muted); }
@@ -1268,7 +1268,7 @@ export default function Sidebar() {
         }
         .sb-link-icon {
           width: 16px; height: 16px; flex-shrink: 0;
-          color: var(--text-dim); transition: color 0.1s;
+          color: var(--text-muted); transition: color 0.1s;
         }
         .sb-link[data-active="true"] .sb-link-icon { color: var(--text); }
         .sb-link:hover .sb-link-icon { color: var(--text-muted); }
@@ -1320,7 +1320,7 @@ export default function Sidebar() {
         .sb-section-label {
           flex: 1; font-size: 10.5px; font-weight: 650;
           letter-spacing: 0.06em; text-transform: uppercase;
-          color: var(--text-dim);
+          color: var(--text-muted);
         }
         .sb-section-action {
           background: none; border: none; cursor: pointer;
@@ -1339,7 +1339,7 @@ export default function Sidebar() {
         .sb-space-row:hover { background: var(--surface2); }
         .sb-chevron {
           background: none; border: none; cursor: pointer;
-          padding: 6px 4px 6px 6px; color: var(--text-dim);
+          padding: 6px 4px 6px 6px; color: var(--text-muted);
           display: flex; align-items: center; flex-shrink: 0;
           transition: color 0.1s;
         }
@@ -1359,7 +1359,7 @@ export default function Sidebar() {
         }
         .sb-space-row:hover .sb-space-name { color: var(--text); }
         .sb-space-count {
-          font-size: 10px; font-weight: 600; color: var(--text-dim);
+          font-size: 10px; font-weight: 600; color: var(--text-muted);
           margin-right: 2px; flex-shrink: 0;
         }
         .sb-space-add {
@@ -1493,7 +1493,7 @@ export default function Sidebar() {
         .sb-dock-label {
           font-size: 9.5px; font-weight: 650;
           letter-spacing: 0.06em; text-transform: uppercase;
-          color: var(--text-dim);
+          color: var(--text-muted);
           flex-shrink: 0;
         }
         .sb-dock-icons {
@@ -1503,7 +1503,7 @@ export default function Sidebar() {
         .sb-dock-btn {
           width: 32px; height: 32px; border-radius: 8px;
           border: none; cursor: pointer; background: transparent;
-          color: var(--text-dim);
+          color: var(--text-muted);
           display: flex; align-items: center; justify-content: center;
           transition: background 0.1s, color 0.15s;
           position: relative;
@@ -1560,7 +1560,7 @@ export default function Sidebar() {
         }
         .sb-icon-btn {
           border-radius: 7px; border: none; cursor: pointer;
-          background: transparent; color: var(--text-dim);
+          background: transparent; color: var(--text-muted);
           display: flex; align-items: center; justify-content: center;
           transition: background 0.1s, color 0.15s;
         }
