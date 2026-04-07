@@ -51,6 +51,42 @@ export const create = mutation({
       createdAt: now(),
     });
 
+    // Seed default roles (Admin, Manager, Member) for the new org
+    const SYSTEM_ROLES: Record<string, string[]> = {
+      Admin: [
+        "space.create", "space.edit", "space.delete", "space.archive",
+        "project.create", "project.edit", "project.delete",
+        "task.create", "task.edit", "task.delete", "task.approve", "task.assign",
+        "member.invite", "member.remove", "member.role_change",
+        "settings.edit",
+        "goal.create", "goal.edit", "goal.delete",
+        "automation.create", "automation.edit", "automation.delete",
+        "custom_field.create", "custom_field.edit", "custom_field.delete",
+      ],
+      Manager: [
+        "space.create", "space.edit", "space.archive",
+        "project.create", "project.edit",
+        "task.create", "task.edit", "task.delete", "task.approve", "task.assign",
+        "member.invite",
+        "goal.create", "goal.edit",
+        "automation.create", "automation.edit",
+        "custom_field.create", "custom_field.edit",
+      ],
+      Member: [
+        "task.create", "task.edit",
+      ],
+    };
+    for (const [roleName, perms] of Object.entries(SYSTEM_ROLES)) {
+      await ctx.db.insert("roles", {
+        orgId,
+        name: roleName,
+        isSystem: true,
+        permissions: perms,
+        createdAt: now(),
+        updatedAt: now(),
+      });
+    }
+
     // Seed an activity
     await ctx.db.insert("activities", {
       orgId,

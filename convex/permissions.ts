@@ -59,7 +59,11 @@ export const getMemberPermissions = query({
       .query("roles")
       .withIndex("by_org_and_name", (q) => q.eq("orgId", orgId).eq("name", roleName))
       .first();
-    return role?.permissions ?? [];
+    // If the role exists in the DB, use its permissions
+    if (role) return role.permissions;
+    // Fallback to hardcoded defaults if roles haven't been seeded yet
+    if (roleName in SYSTEM_ROLES) return SYSTEM_ROLES[roleName];
+    return [];
   },
 });
 

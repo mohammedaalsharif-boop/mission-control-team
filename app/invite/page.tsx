@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "convex/react";
@@ -18,6 +18,30 @@ export default function InvitePage() {
   const token = searchParams.get("token") ?? "";
   const invite = useQuery(api.inviteActions.getInviteByToken, token ? { token } : "skip");
   const acceptInvite = useMutation(api.inviteActions.acceptInvite);
+
+  // Short, pleasant success chime using Web Audio API
+  const playSuccessSound = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playTone = (freq: number, start: number, duration: number, gain: number) => {
+        const osc = ctx.createOscillator();
+        const vol = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        vol.gain.setValueAtTime(gain, ctx.currentTime + start);
+        vol.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+        osc.connect(vol);
+        vol.connect(ctx.destination);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + duration);
+      };
+      // Two-note rising chime: C5 → E5
+      playTone(523.25, 0, 0.15, 0.18);
+      playTone(659.25, 0.1, 0.25, 0.22);
+    } catch {
+      // Audio not available — silently skip
+    }
+  }, []);
 
   const [flow,     setFlow]     = useState<"signIn" | "signUp">("signUp");
   const [email,    setEmail]    = useState("");
@@ -40,12 +64,13 @@ export default function InvitePage() {
         setLoading(true);
         const result = await acceptInvite({ token });
         setAccepted(true);
+        playSuccessSound();
         // Store the org so AuthProvider picks it up
         if (result?.orgId) {
           localStorage.setItem("mc_current_org", result.orgId);
         }
-        // Short delay then redirect to dashboard
-        setTimeout(() => router.replace("/"), 1500);
+        // Brief flash of success + chime, then redirect to dashboard
+        setTimeout(() => router.replace("/"), 800);
       } catch (err: any) {
         setError(err?.message || t.genericError);
       } finally {

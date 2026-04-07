@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { requireSameOrg, getCallerMember } from "./helpers";
+import { requireSameOrg, getCallerMember, requirePermission } from "./helpers";
 
 const now = () => Date.now();
 
@@ -159,9 +159,12 @@ export const create = mutation({
     supporterId: v.optional(v.id("members")),
     startDate:   v.optional(v.number()),
     dueDate:     v.optional(v.number()),
-    createdBy:   v.id("members"),
+    createdBy:   v.optional(v.id("members")),  // deprecated: now derived server-side
   },
   handler: async (ctx, args) => {
+    // Verify the caller has the "project.create" permission
+    const member = await requirePermission(ctx, args.orgId, "project.create");
+
     const projectId = await ctx.db.insert("projects", {
       orgId:       args.orgId,
       spaceId:     args.spaceId,
@@ -173,18 +176,18 @@ export const create = mutation({
       supporterId: args.supporterId,
       startDate:   args.startDate,
       dueDate:     args.dueDate,
-      createdBy:   args.createdBy,
+      createdBy:   member._id,
       createdAt:   now(),
       updatedAt:   now(),
     });
 
     await ctx.db.insert("projectMembers", {
       projectId,
-      memberId: args.createdBy,
+      memberId: member._id,
       addedAt:  now(),
     });
 
-    if (args.ownerId && args.ownerId !== args.createdBy) {
+    if (args.ownerId && args.ownerId !== member._id) {
       await ctx.db.insert("projectMembers", {
         projectId,
         memberId: args.ownerId,
@@ -196,7 +199,7 @@ export const create = mutation({
       orgId:       args.orgId,
       type:        "project_created",
       projectId,
-      memberId:    args.createdBy,
+      memberId:    member._id,
       description: `Created project: ${args.name.trim()}`,
       createdAt:   now(),
     });

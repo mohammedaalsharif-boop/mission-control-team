@@ -95,6 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : "skip"
   ) ?? [];
 
+  // Auto-seed default roles for existing orgs that don't have them yet
+  const seedRoles = useMutation(api.permissions.seedDefaultRoles);
+  const orgRoles = useQuery(
+    api.permissions.listRoles,
+    selectedOrgId ? { orgId: selectedOrgId as Id<"organizations"> } : "skip"
+  );
+  useEffect(() => {
+    if (selectedOrgId && orgRoles !== undefined && orgRoles.length === 0 && memberDoc?.role === "admin") {
+      seedRoles({ orgId: selectedOrgId as Id<"organizations"> });
+    }
+  }, [selectedOrgId, orgRoles, memberDoc?.role, seedRoles]);
+
   const can = (permission: string): boolean => {
     if (!memberDoc) return false;
     // Admins can always do everything
@@ -103,12 +115,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Derived state ────────────────────────────────────────────────────────
-  const isLoading = convexLoading || (isAuthenticated && (email === undefined || (email !== null && orgsRaw === undefined)));
+  // Wait for all sequential queries to resolve before considering "loaded":
+  //   1. email query must have returned (not undefined)
+  //   2. orgs query must have returned (not undefined) — skipped only when email is null
+  //   3. memberDoc must have returned when an org is selected
+  const isLoading = convexLoading || (isAuthenticated && (
+    email === undefined ||
+    (email !== null && orgsRaw === undefined) ||
+    (!!selectedOrgId && memberDoc === undefined)
+  ));
 
+  // Only show OrgGate when orgs query has truly completed (orgsRaw !== undefined)
+  // and the user genuinely has no org or needs to pick from multiple.
+  // Single-org users are auto-selected by the useEffect above, so skip OrgGate for them.
   const needsOrg =
     !isLoading && isAuthenticated &&
-    (orgs.length === 0 || !selectedOrgId) &&
-    email !== undefined;
+    orgsRaw !== undefined &&
+    email != null &&
+    (
+      orgs.length === 0 ||
+      (orgs.length > 1 && !selectedOrgId)
+    );
 
   const user: CurrentUser | null = memberDoc && selectedOrgId
     ? {
