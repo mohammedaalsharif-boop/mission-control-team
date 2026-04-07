@@ -11,11 +11,16 @@ export async function getCallerEmail(ctx: Ctx): Promise<string> {
   // Prefer the identity email set by Convex Auth
   if (identity.email) return identity.email.trim().toLowerCase();
 
-  // Fallback: look up the users table
-  const userId = identity.subject.split("|")[0] as Id<"users">;
-  const authUser = await ctx.db.get(userId);
-  if (!authUser?.email) throw new Error("You are not authorised to access this workspace.");
-  return authUser.email.trim().toLowerCase();
+  // Fallback: look up the users table (wrap in try/catch in case the
+  // subject doesn't contain a valid Convex user ID)
+  try {
+    const userId = identity.subject.split("|")[0] as Id<"users">;
+    const authUser = await ctx.db.get(userId);
+    if (authUser?.email) return authUser.email.trim().toLowerCase();
+  } catch {
+    // Invalid ID format or DB lookup failed — fall through
+  }
+  throw new Error("You are not authorised to access this workspace.");
 }
 
 /**

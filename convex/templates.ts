@@ -7,7 +7,9 @@ export const listByMember = query({
   handler: async (ctx, { memberId }) => {
     const member = await ctx.db.get(memberId);
     if (!member) return [];
-    if (member.orgId) await getCallerMember(ctx, member.orgId);
+    if (member.orgId) {
+      try { await getCallerMember(ctx, member.orgId); } catch { return []; }
+    }
     return ctx.db
       .query("templates")
       .withIndex("by_member", (q) => q.eq("memberId", memberId))
