@@ -35,11 +35,15 @@ const SYSTEM_ROLES: Record<string, string[]> = {
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
-/** List all roles for an org. */
+/** List all roles for an org. Returns [] if the caller is not a member. */
 export const listRoles = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try {
+      await getCallerMember(ctx, orgId);
+    } catch {
+      return [];  // Caller is not a member (e.g. removed) — return empty gracefully
+    }
     return ctx.db
       .query("roles")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -54,7 +58,11 @@ export const getMemberPermissions = query({
     roleName: v.string(),
   },
   handler: async (ctx, { orgId, roleName }) => {
-    await getCallerMember(ctx, orgId);
+    try {
+      await getCallerMember(ctx, orgId);
+    } catch {
+      return [];  // Caller is not a member — no permissions
+    }
     const role = await ctx.db
       .query("roles")
       .withIndex("by_org_and_name", (q) => q.eq("orgId", orgId).eq("name", roleName))

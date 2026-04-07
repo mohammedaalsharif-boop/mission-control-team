@@ -151,7 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     : null;
 
-  // ── Only redirect: unauthenticated → /login, authenticated+ready → away from /login
+  // ── Redirect: unauthenticated → /login, authenticated+ready → away from /login
+  // ── Also: if user was removed from all orgs, sign them out gracefully
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated && pathname !== "/login") {
@@ -160,7 +161,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated && user && pathname === "/login") {
       router.replace("/");
     }
-  }, [isAuthenticated, isLoading, user, pathname, router]);
+    // If the user is authenticated but has no orgs (removed from all),
+    // clear stale state and sign them out so they land on the login page.
+    if (
+      isAuthenticated &&
+      !isLoading &&
+      orgsRaw !== undefined &&
+      orgs.length === 0 &&
+      email != null &&
+      pathname !== "/login" &&
+      pathname !== "/invite"
+    ) {
+      localStorage.removeItem(ORG_STORAGE_KEY);
+      signOut().then(() => router.replace("/login"));
+    }
+  }, [isAuthenticated, isLoading, user, pathname, router, orgsRaw, orgs.length, email, signOut]);
 
   const switchOrg = (newOrgId: string) => {
     setSelectedOrgId(newOrgId);
