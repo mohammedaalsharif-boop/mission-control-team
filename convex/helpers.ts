@@ -3,15 +3,19 @@ import { Id } from "./_generated/dataModel";
 
 type Ctx = MutationCtx | QueryCtx;
 
-/** Resolves the caller's email from their JWT identity. */
+/** Resolves the caller's email from their JWT identity. Always returns lowercase. */
 export async function getCallerEmail(ctx: Ctx): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Not authenticated.");
 
+  // Prefer the identity email set by Convex Auth
+  if (identity.email) return identity.email.trim().toLowerCase();
+
+  // Fallback: look up the users table
   const userId = identity.subject.split("|")[0] as Id<"users">;
   const authUser = await ctx.db.get(userId);
   if (!authUser?.email) throw new Error("You are not authorised to access this workspace.");
-  return authUser.email;
+  return authUser.email.trim().toLowerCase();
 }
 
 /**
