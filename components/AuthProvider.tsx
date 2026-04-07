@@ -128,13 +128,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Only show OrgGate when orgs query has truly completed (orgsRaw !== undefined)
   // and the user genuinely has no org or needs to pick from multiple.
   // Single-org users are auto-selected by the useEffect above, so skip OrgGate for them.
+  // Also show OrgGate if the selected org's memberDoc resolved to null (member not found
+  // for that org — e.g. stale localStorage pointing to an org the user left).
+  const memberNotFound = selectedOrgId && memberDoc === null;
   const needsOrg =
     !isLoading && isAuthenticated &&
     orgsRaw !== undefined &&
     email != null &&
     (
       orgs.length === 0 ||
-      (orgs.length > 1 && !selectedOrgId)
+      (orgs.length > 1 && !selectedOrgId) ||
+      !!memberNotFound
     );
 
   const user: CurrentUser | null = memberDoc && selectedOrgId

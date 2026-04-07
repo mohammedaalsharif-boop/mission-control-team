@@ -10,13 +10,28 @@ export const currentMember = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
-    const userId = identity.subject.split("|")[0] as Id<"users">;
-    const authUser = await ctx.db.get(userId);
-    if (!authUser?.email) return null;
+    // Try identity email first (set by Convex Auth)
+    let email: string | null = identity.email ?? null;
+
+    // Fallback: look up the users table
+    if (!email) {
+      try {
+        const userId = identity.subject.split("|")[0] as Id<"users">;
+        const authUser = await ctx.db.get(userId);
+        email = authUser?.email ?? null;
+      } catch {
+        // Invalid userId format — skip
+      }
+    }
+
+    if (!email) return null;
+
+    // Always normalise to match the lowercase emails stored in members table
+    const normalised = email.trim().toLowerCase();
 
     return ctx.db
       .query("members")
-      .withIndex("by_org_and_email", (q) => q.eq("orgId", orgId).eq("email", authUser.email!))
+      .withIndex("by_org_and_email", (q) => q.eq("orgId", orgId).eq("email", normalised))
       .first();
   },
 });
@@ -29,13 +44,13 @@ export const currentEmail = query({
     if (!identity) return null;
 
     // Try the identity email directly first (Convex Auth sets this)
-    if (identity.email) return identity.email;
+    if (identity.email) return identity.email.trim().toLowerCase();
 
     // Fallback: look up user record
     try {
       const userId = identity.subject.split("|")[0] as Id<"users">;
       const authUser = await ctx.db.get(userId);
-      return authUser?.email ?? null;
+      return authUser?.email?.trim().toLowerCase() ?? null;
     } catch {
       return null;
     }
