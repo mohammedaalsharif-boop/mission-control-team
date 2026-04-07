@@ -94,7 +94,7 @@ export const createInvite = mutation({
 export const listInvites = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     const invites = await ctx.db
       .query("invites")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

@@ -10,7 +10,7 @@ const now = () => Date.now();
 export const list = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     return ctx.db
       .query("goals")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -25,7 +25,7 @@ export const getById = query({
   handler: async (ctx, { goalId }) => {
     const goal = await ctx.db.get(goalId);
     if (!goal) return null;
-    await getCallerMember(ctx, goal.orgId);
+    try { await getCallerMember(ctx, goal.orgId); } catch { return null; }
     return goal;
   },
 });

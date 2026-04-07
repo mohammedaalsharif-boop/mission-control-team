@@ -12,7 +12,7 @@ const VALID_FIELD_TYPES = ["text", "number", "select", "date", "checkbox"];
 export const listDefs = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     return ctx.db
       .query("customFieldDefs")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

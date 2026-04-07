@@ -10,7 +10,7 @@ export const getSetting = query({
     key:   v.string(),
   },
   handler: async (ctx, { orgId, key }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return null; }
     const s = await ctx.db
       .query("settings")
       .withIndex("by_org_and_key", (q) => q.eq("orgId", orgId).eq("key", key))
@@ -22,7 +22,7 @@ export const getSetting = query({
 export const getAllSettings = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     return ctx.db
       .query("settings")
       .withIndex("by_org_and_key", (q) => q.eq("orgId", orgId))

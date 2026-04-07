@@ -8,7 +8,7 @@ const now = () => Date.now();
 export const listAdminNotifications = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     // Use compound index to fetch only admin notifications directly
     const result = [];
     for await (const n of ctx.db
@@ -29,7 +29,9 @@ export const listMemberNotifications = query({
   handler: async (ctx, { memberId }) => {
     const member = await ctx.db.get(memberId);
     if (!member) return [];
-    if (member.orgId) await getCallerMember(ctx, member.orgId);
+    if (member.orgId) {
+      try { await getCallerMember(ctx, member.orgId); } catch { return []; }
+    }
     return ctx.db
       .query("notifications")
       .withIndex("by_member", (q) => q.eq("forMemberId", memberId))
@@ -42,7 +44,7 @@ export const listMemberNotifications = query({
 export const countUnreadAdmin = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return 0; }
     // Use compound index to count only unread admin notifications
     let count = 0;
     for await (const _ of ctx.db
@@ -61,7 +63,9 @@ export const countUnreadMember = query({
   handler: async (ctx, { memberId }) => {
     const member = await ctx.db.get(memberId);
     if (!member) return 0;
-    if (member.orgId) await getCallerMember(ctx, member.orgId);
+    if (member.orgId) {
+      try { await getCallerMember(ctx, member.orgId); } catch { return 0; }
+    }
     // Use compound index to count only unread member notifications
     let count = 0;
     for await (const _ of ctx.db

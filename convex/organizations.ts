@@ -139,8 +139,7 @@ export const listForUser = query({
 export const getById = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    // Verify caller is a member of this org
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return null; }
     return ctx.db.get(orgId);
   },
 });

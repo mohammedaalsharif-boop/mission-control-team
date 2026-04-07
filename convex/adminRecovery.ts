@@ -88,7 +88,7 @@ export const setBackupAdmin = mutation({
 export const getBackupAdmin = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return null; }
 
     const setting = await ctx.db
       .query("settings")

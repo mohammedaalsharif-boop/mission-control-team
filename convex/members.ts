@@ -28,7 +28,7 @@ export const validateLogin = mutation({
 export const listMembers = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     return ctx.db
       .query("members")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

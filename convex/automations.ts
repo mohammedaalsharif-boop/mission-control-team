@@ -31,7 +31,7 @@ export const ACTIONS = [
 export const list = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    await getCallerMember(ctx, orgId);
+    try { await getCallerMember(ctx, orgId); } catch { return []; }
     return ctx.db
       .query("automations")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
