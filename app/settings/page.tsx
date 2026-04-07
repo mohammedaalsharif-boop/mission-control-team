@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -12,6 +12,52 @@ import {
   ChevronDown, Check, Bell, Globe, Lock, Link2,
   CheckCircle, XCircle, BarChart2, Mail, Zap, Sliders,
 } from "lucide-react";
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+
+function useToast(duration = 2000) {
+  const [toast, setToast] = useState<{ message: string; visible: boolean } | null>(null);
+  const show = useCallback((message: string) => {
+    setToast({ message, visible: true });
+  }, []);
+  useEffect(() => {
+    if (!toast?.visible) return;
+    const fade = setTimeout(() => setToast((t) => t ? { ...t, visible: false } : null), duration);
+    const clear = setTimeout(() => setToast(null), duration + 300);
+    return () => { clearTimeout(fade); clearTimeout(clear); };
+  }, [toast?.visible, duration]);
+  return { toast, show };
+}
+
+function Toast({ message, visible }: { message: string; visible: boolean }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 32,
+        left: "50%",
+        transform: `translateX(-50%) translateY(${visible ? "0" : "12px"})`,
+        opacity: visible ? 1 : 0,
+        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        background: "var(--surface2, #1e1e2e)",
+        color: "var(--text, #fff)",
+        padding: "10px 20px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 500,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        boxShadow: "0 8px 30px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.06)",
+        zIndex: 9999,
+        pointerEvents: "none",
+      }}
+    >
+      <Check size={14} style={{ color: "#22c55e", flexShrink: 0 }} />
+      {message}
+    </div>
+  );
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +181,7 @@ function TeamTab() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const { toast, show: showToast } = useToast(2000);
 
   const pendingInvites = invites.filter((inv: any) => inv.status === "pending" && inv.expiresAt > Date.now());
 
@@ -275,8 +322,7 @@ function TeamTab() {
                   onClick={() => {
                     const url = `${window.location.origin}/invite?token=${inv.token}`;
                     navigator.clipboard.writeText(url).then(() => {
-                      setSuccess(t.teamTab.linkCopied);
-                      setTimeout(() => setSuccess(""), 2000);
+                      showToast(t.teamTab.linkCopied);
                     });
                   }}
                   style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10.5, fontWeight: 600, background: "var(--accent-bg)", color: "var(--accent-light)", border: "1px solid rgba(99,102,241,0.3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
@@ -405,6 +451,7 @@ function TeamTab() {
           );
         })}
       </div>
+      {toast && <Toast message={toast.message} visible={toast.visible} />}
     </div>
   );
 }
