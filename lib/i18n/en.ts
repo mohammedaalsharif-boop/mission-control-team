@@ -580,6 +580,7 @@ const en = {
     adding: "Adding…",
     activity: "activity",
     viewActivity: "View activity",
+    searchMembers: "Search members…",
   },
 
   // ── Approvals Page ────────────────────────────────────────────────

@@ -581,6 +581,7 @@ const ar: Translations = {
     adding: "جاري الإضافة…",
     activity: "نشاط",
     viewActivity: "عرض النشاط",
+    searchMembers: "ابحث عن الأعضاء…",
   },
 
   // ── Approvals Page ────────────────────────────────────────────────

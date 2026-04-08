@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/components/AuthProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import Sidebar from "@/components/Sidebar";
-import { UserPlus, Trash2, Shield, User, Mail, XCircle, Link2, Check } from "lucide-react";
+import { UserPlus, Trash2, Shield, User, Mail, XCircle, Link2, Check, Search } from "lucide-react";
 
 export default function MembersPage() {
   const router = useRouter();
@@ -30,6 +30,7 @@ export default function MembersPage() {
   const [success,   setSuccess]   = useState("");
   const [loading,   setLoading]   = useState(false);
   const [copiedId,  setCopiedId]  = useState<string | null>(null);
+  const [search,    setSearch]    = useState("");
 
   const copyInviteLink = async (token: string, inviteId: string) => {
     const url = `${window.location.origin}/invite?token=${token}`;
@@ -98,6 +99,28 @@ export default function MembersPage() {
             >
               <UserPlus size={14} /> {t.teamTab?.inviteMember ?? "Invite Member"}
             </button>
+          </div>
+
+          {/* Search bar */}
+          <div style={{ position: "relative", marginBottom: 16 }}>
+            <Search size={14} style={{
+              position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+              color: "var(--text-muted)", pointerEvents: "none",
+            }} />
+            <input
+              type="text"
+              placeholder={t.membersPage.searchMembers ?? "Search members…"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%", padding: "9px 14px 9px 34px", borderRadius: 10, fontSize: 13,
+                background: "var(--surface)", border: "1px solid var(--border2)",
+                color: "var(--text)", outline: "none", boxSizing: "border-box",
+                transition: "border-color 0.15s",
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = "var(--accent-muted)"}
+              onBlur={(e) => e.currentTarget.style.borderColor = "var(--border2)"}
+            />
           </div>
 
           {/* Invite form */}
@@ -228,7 +251,11 @@ export default function MembersPage() {
 
           {/* Members list */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {members.map((m: any) => {
+            {members.filter((m: any) => {
+              if (!search.trim()) return true;
+              const q = search.toLowerCase();
+              return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+            }).map((m: any) => {
               const total     = taskCountFor(m._id);
               const completed = completedFor(m._id);
               const pct       = total > 0 ? Math.round((completed / total) * 100) : 0;
