@@ -204,14 +204,31 @@ export const getActivities = query({
       .take(50),
 });
 
+// Only surface work-related activities: creating, completing, submitting,
+// approving tasks, and commenting — things that move toward the goal.
+const MEMBER_ACTIVITY_TYPES = new Set([
+  "task_created",
+  "task_moved",
+  "task_submitted",
+  "task_approved",
+  "task_rejected",
+  "comment_added",
+  "project_created",
+]);
+
 export const getMemberActivities = query({
   args: { memberId: v.id("members") },
-  handler: async (ctx, { memberId }) =>
-    ctx.db
+  handler: async (ctx, { memberId }) => {
+    const result = [];
+    for await (const a of ctx.db
       .query("activities")
       .withIndex("by_member", (q) => q.eq("memberId", memberId))
-      .order("desc")
-      .take(100),
+      .order("desc")) {
+      if (MEMBER_ACTIVITY_TYPES.has(a.type)) result.push(a);
+      if (result.length >= 100) break;
+    }
+    return result;
+  },
 });
 
 export const getProjectActivities = query({
