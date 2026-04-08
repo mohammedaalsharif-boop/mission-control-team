@@ -579,6 +579,8 @@ const ar: Translations = {
     admin: "مدير",
     removeMember: "إزالة العضو",
     adding: "جاري الإضافة…",
+    activity: "نشاط",
+    viewActivity: "عرض النشاط",
   },
 
   // ── Approvals Page ────────────────────────────────────────────────

@@ -578,6 +578,8 @@ const en = {
     admin: "Admin",
     removeMember: "Remove member",
     adding: "Adding…",
+    activity: "activity",
+    viewActivity: "View activity",
   },
 
   // ── Approvals Page ────────────────────────────────────────────────

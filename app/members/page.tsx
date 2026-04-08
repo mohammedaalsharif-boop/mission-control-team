@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -10,6 +11,7 @@ import Sidebar from "@/components/Sidebar";
 import { UserPlus, Trash2, Shield, User, Mail, XCircle, Link2, Check } from "lucide-react";
 
 export default function MembersPage() {
+  const router = useRouter();
   const { isLoading, orgId, can } = useAuth();
   const { t } = useLocale();
   const membersArgs = orgId ? { orgId } : "skip" as const;
@@ -232,11 +234,24 @@ export default function MembersPage() {
               const pct       = total > 0 ? Math.round((completed / total) * 100) : 0;
 
               return (
-                <div key={m._id} style={{
-                  background: "var(--surface)", border: "1px solid var(--border2)",
-                  borderRadius: 12, padding: "16px 20px",
-                  display: "flex", alignItems: "center", gap: 16,
-                }}>
+                <div
+                  key={m._id}
+                  onClick={() => router.push(`/members/${m._id}`)}
+                  style={{
+                    background: "var(--surface)", border: "1px solid var(--border2)",
+                    borderRadius: 12, padding: "16px 20px",
+                    display: "flex", alignItems: "center", gap: 16,
+                    cursor: "pointer", transition: "border-color 0.15s, background 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--accent-muted)";
+                    e.currentTarget.style.background = "var(--surface2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border2)";
+                    e.currentTarget.style.background = "var(--surface)";
+                  }}
+                >
                   {/* Avatar */}
                   <div style={{
                     width: 40, height: 40, borderRadius: "50%",
@@ -286,7 +301,7 @@ export default function MembersPage() {
                   {/* Remove (not for admin) */}
                   {m.role !== "admin" && (
                     <button
-                      onClick={() => orgId && removeMember({ orgId, memberId: m._id })}
+                      onClick={(e) => { e.stopPropagation(); orgId && removeMember({ orgId, memberId: m._id }); }}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", display: "flex", padding: 4 }}
                       onMouseEnter={(e) => (e.currentTarget.style.color = "var(--status-danger)")}
                       onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}

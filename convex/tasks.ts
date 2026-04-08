@@ -204,6 +204,16 @@ export const getActivities = query({
       .take(50),
 });
 
+export const getMemberActivities = query({
+  args: { memberId: v.id("members") },
+  handler: async (ctx, { memberId }) =>
+    ctx.db
+      .query("activities")
+      .withIndex("by_member", (q) => q.eq("memberId", memberId))
+      .order("desc")
+      .take(100),
+});
+
 export const getProjectActivities = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) =>
