@@ -744,6 +744,7 @@ const en = {
     doneCount: "done",
     spaces: "Spaces",
     activity: "Activity",
+    overview: "Overview",
   },
 
   // ── Space Detail Page ─────────────────────────────────────────────

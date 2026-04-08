@@ -12,12 +12,13 @@ import TaskCard from "@/components/tasks/TaskCard";
 import {
   Plus, ChevronRight, ChevronLeft, X,
   LayoutGrid, List, Users, Search,
-  Calendar, AlertTriangle, Sparkles, Pencil, UserCircle2, ChevronDown, Activity,
+  Calendar, AlertTriangle, Sparkles, Pencil, UserCircle2, ChevronDown, Activity, PieChart,
 } from "lucide-react";
 import { TeamTask } from "@/lib/task-types";
 import ListView from "@/components/tasks/ListView";
 import ProjectCalendar from "@/components/tasks/ProjectCalendar";
 import ProjectTimeline from "@/components/tasks/ProjectTimeline";
+import ProjectOverview from "@/components/tasks/ProjectOverview";
 
 const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", dueDate: "", visibility: "public" };
 
@@ -371,7 +372,7 @@ export default function ProjectPage() {
     { value: "low",    label: t.projectPage.low,    color: "var(--status-success)" },
   ];
 
-  const [view,            setView]            = useState<"kanban" | "list" | "calendar" | "activity">("kanban");
+  const [view,            setView]            = useState<"overview" | "kanban" | "list" | "calendar" | "activity">("kanban");
   const [addingCol,       setAddingCol]       = useState<string | null>(null);
   const [form,            setForm]            = useState(EMPTY_FORM);
   const [dragOver,        setDragOver]        = useState<string | null>(null);
@@ -688,10 +689,11 @@ export default function ProjectPage() {
               borderRadius: 8, padding: 3,
             }}>
               {([
-                { id: "kanban",   icon: <LayoutGrid size={13} />, label: t.projectPage.kanban   },
-                { id: "list",     icon: <List       size={13} />, label: t.projectPage.list     },
-                { id: "calendar", icon: <Calendar   size={13} />, label: t.projectPage.calendar },
-                { id: "activity", icon: <Activity   size={13} />, label: t.projectPage.activity ?? "Activity" },
+                { id: "overview",  icon: <PieChart   size={13} />, label: t.projectPage.overview ?? "Overview" },
+                { id: "kanban",    icon: <LayoutGrid size={13} />, label: t.projectPage.kanban   },
+                { id: "list",      icon: <List       size={13} />, label: t.projectPage.list     },
+                { id: "calendar",  icon: <Calendar   size={13} />, label: t.projectPage.calendar },
+                { id: "activity",  icon: <Activity   size={13} />, label: t.projectPage.activity ?? "Activity" },
               ] as const).map((v) => (
                 <button
                   key={v.id}
@@ -920,6 +922,15 @@ export default function ProjectPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Overview dashboard */}
+        {view === "overview" && (
+          <ProjectOverview
+            project={project as any}
+            tasks={tasks as any}
+            members={members as any}
+          />
         )}
 
         {/* Activity timeline view */}

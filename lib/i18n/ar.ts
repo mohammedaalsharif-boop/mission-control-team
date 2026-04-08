@@ -744,6 +744,7 @@ const ar: Translations = {
     doneCount: "مكتمل",
     spaces: "المساحات",
     activity: "النشاط",
+    overview: "نظرة عامة",
   },
 
   // ── Space Detail Page ─────────────────────────────────────────────
