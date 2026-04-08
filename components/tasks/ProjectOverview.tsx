@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  CheckCircle2, Clock, AlertTriangle, Send, FileText,
-  TrendingUp, Users, Target,
-} from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { useLocale } from "@/components/LocaleProvider";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -28,7 +27,9 @@ interface Member {
 }
 
 interface Project {
+  _id: string;
   name: string;
+  description?: string;
   northStar?: string;
   status: string;
   startDate?: number;
@@ -40,6 +41,7 @@ interface Props {
   project: Project;
   tasks: Task[];
   members: Member[];
+  projectId: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -48,275 +50,489 @@ function initials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  high: "var(--status-danger)",
-  medium: "var(--status-warning)",
-  low: "var(--status-success)",
-};
+function formatDate(ts: number, locale: string): string {
+  return new Date(ts).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  }).toUpperCase();
+}
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  draft:       { label: "To Do",       color: "var(--text-muted)",      bg: "rgba(113,113,122,0.10)" },
-  in_progress: { label: "In Progress", color: "var(--status-info)",     bg: "rgba(59,130,246,0.10)" },
-  submitted:   { label: "Submitted",   color: "var(--status-warning)",  bg: "rgba(245,158,11,0.10)" },
-  completed:   { label: "Completed",   color: "var(--status-success)",  bg: "rgba(34,197,94,0.10)" },
-};
+function formatTime(ts: number, locale: string): string {
+  return new Date(ts).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US", {
+    hour: "numeric", minute: "2-digit",
+  }).toLowerCase();
+}
 
-// ── Component ────────────────────────────────────────────────────────────────
+const AVATAR_COLORS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
+  "#3b82f6", "#ef4444", "#14b8a6", "#f97316", "#06b6d4",
+];
 
-export default function ProjectOverview({ project, tasks, members }: Props) {
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ── Card shell ───────────────────────────────────────────────────────────────
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      border: "1px solid #e0e0e0",
+      borderRadius: 6,
+      background: "#fff",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 260,
+    }}>
+      {/* Card title */}
+      <div style={{
+        borderBottom: "1px solid #e0e0e0",
+        padding: "14px 18px",
+        textAlign: "center",
+      }}>
+        <h3 style={{
+          fontSize: 16, fontWeight: 700, color: "#1a1a1a",
+          margin: 0, letterSpacing: "-0.01em",
+        }}>
+          {title}
+        </h3>
+      </div>
+      {/* Card body */}
+      <div style={{ flex: 1, padding: "12px 18px", overflowY: "auto" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+
+function Avatar({ name, size = 28 }: { name: string; size?: number }) {
+  const bg = avatarColor(name);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: bg,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.38, fontWeight: 700, color: "#fff",
+    }}>
+      {initials(name)}
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+
+export default function ProjectOverview({ project, tasks, members, projectId }: Props) {
   const { locale } = useLocale();
   const now = Date.now();
 
+  // Fetch comments and activities for this project
+  const activities = useQuery(
+    api.tasks.getProjectActivities,
+    { projectId: projectId as Id<"projects"> },
+  ) ?? [];
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+
+  const todosByStatus = useMemo(() => {
+    const groups: Record<string, Task[]> = {
+      draft: [], in_progress: [], submitted: [], completed: [],
+    };
+    for (const t of tasks) {
+      if (groups[t.status]) groups[t.status].push(t);
+    }
+    return groups;
+  }, [tasks]);
+
+  const schedule = useMemo(() => {
+    return tasks
+      .filter((t) => {
+        const due = t.dueDate ?? t.submissionDate;
+        return due && t.status !== "completed";
+      })
+      .sort((a, b) => {
+        const aD = a.dueDate ?? a.submissionDate ?? 0;
+        const bD = b.dueDate ?? b.submissionDate ?? 0;
+        return aD - bD;
+      })
+      .slice(0, 8);
+  }, [tasks]);
+
+  const recentActivity = useMemo(() => activities.slice(0, 8), [activities]);
+
   const stats = useMemo(() => {
     const total = tasks.length;
-    const byStatus: Record<string, Task[]> = { draft: [], in_progress: [], submitted: [], completed: [] };
-    let overdue = 0;
-    let dueSoon = 0;
-    const sevenDays = 7 * 86_400_000;
-
-    for (const t of tasks) {
-      if (byStatus[t.status]) byStatus[t.status].push(t);
-      if (t.status !== "completed") {
-        const due = t.dueDate ?? t.submissionDate;
-        if (due && due < now) overdue++;
-        else if (due && due < now + sevenDays) dueSoon++;
-      }
-    }
-
-    const completed = byStatus.completed.length;
+    const completed = tasks.filter((t) => t.status === "completed").length;
+    const overdue = tasks.filter((t) => {
+      const due = t.dueDate ?? t.submissionDate;
+      return due && due < now && t.status !== "completed";
+    }).length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    // Member workload
-    const memberWork: Record<string, { total: number; done: number }> = {};
-    for (const t of tasks) {
-      if (!memberWork[t.memberId]) memberWork[t.memberId] = { total: 0, done: 0 };
-      memberWork[t.memberId].total++;
-      if (t.status === "completed") memberWork[t.memberId].done++;
-    }
-
-    // Priority breakdown
-    const byPriority: Record<string, number> = { high: 0, medium: 0, low: 0 };
-    for (const t of tasks) {
-      if (t.status !== "completed" && t.priority) {
-        byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
-      }
-    }
-
-    return { total, completed, pct, overdue, dueSoon, byStatus, memberWork, byPriority };
+    return { total, completed, overdue, pct };
   }, [tasks, now]);
 
-  const formatDate = (ts: number) =>
-    new Date(ts).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-      month: "short", day: "numeric", year: "numeric",
-    });
+  // ── Project members (with tasks) for avatar row ───────────────────────────
 
-  // ── Card wrapper ──────────────────────────────────────────────────────────
-  const Card = ({ title, icon, children, span }: {
-    title: string; icon: React.ReactNode; children: React.ReactNode; span?: number;
-  }) => (
-    <div style={{
-      background: "var(--surface)", border: "1px solid var(--border2)",
-      borderRadius: 14, padding: "20px 22px",
-      gridColumn: span ? `span ${span}` : undefined,
-      display: "flex", flexDirection: "column", gap: 14,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {icon}
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
+  const projectMembers = useQuery(
+    api.projects.listMembers,
+    { projectId: projectId as Id<"projects"> },
+  ) ?? [];
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+    <div style={{
+      flex: 1, overflowY: "auto",
+      background: "#f6f6f4",
+    }}>
+      {/* ── Header area ─────────────────────────────────────────────────── */}
+      <div style={{
+        textAlign: "center",
+        padding: "32px 28px 24px",
+      }}>
+        <h1 style={{
+          fontSize: 28, fontWeight: 800, color: "#1a1a1a",
+          margin: 0, letterSpacing: "-0.02em",
+        }}>
+          {project.name}
+        </h1>
+        {project.description && (
+          <p style={{ fontSize: 14, color: "#666", margin: "6px 0 0" }}>
+            {project.description}
+          </p>
+        )}
+
+        {/* Member avatar row */}
+        {projectMembers.length > 0 && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 0, marginTop: 18, flexWrap: "wrap",
+          }}>
+            {projectMembers.map((m: any, i: number) => (
+              <div
+                key={m._id}
+                title={m.name}
+                style={{ marginLeft: i > 0 ? -6 : 0, position: "relative", zIndex: projectMembers.length - i }}
+              >
+                <div style={{
+                  width: 38, height: 38, borderRadius: "50%",
+                  background: avatarColor(m.name),
+                  border: "2px solid #f6f6f4",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, fontWeight: 700, color: "#fff",
+                  cursor: "default",
+                }}>
+                  {initials(m.name)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Card grid ────────────────────────────────────────────────────── */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
         gap: 16,
+        padding: "0 28px 32px",
         maxWidth: 1100,
+        margin: "0 auto",
       }}>
 
-        {/* ── Overall Progress ──────────────────────────────────────────── */}
-        <Card title="Progress" icon={<TrendingUp size={15} style={{ color: "var(--accent-light)" }} />} span={2}>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            {/* Circular progress */}
-            <div style={{ position: "relative", width: 90, height: 90, flexShrink: 0 }}>
-              <svg width={90} height={90} viewBox="0 0 90 90">
-                <circle cx={45} cy={45} r={38} fill="none" stroke="var(--border)" strokeWidth={7} />
-                <circle
-                  cx={45} cy={45} r={38} fill="none"
-                  stroke={stats.pct === 100 ? "var(--status-success)" : "var(--accent)"}
-                  strokeWidth={7} strokeLinecap="round"
-                  strokeDasharray={`${(stats.pct / 100) * 238.76} 238.76`}
-                  transform="rotate(-90 45 45)"
-                  style={{ transition: "stroke-dasharray 0.6s ease" }}
-                />
-              </svg>
-              <div style={{
-                position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <span style={{
-                  fontSize: 22, fontWeight: 800,
-                  color: stats.pct === 100 ? "var(--status-success)" : "var(--text)",
+        {/* ── To-dos ──────────────────────────────────────────────────── */}
+        <Card title="To-dos">
+          {(["draft", "in_progress", "submitted"] as const).map((status) => {
+            const items = todosByStatus[status];
+            if (items.length === 0) return null;
+            const label = status === "draft" ? "To Do"
+              : status === "in_progress" ? "In Progress"
+              : "Submitted";
+            return (
+              <div key={status} style={{ marginBottom: 14 }}>
+                <p style={{
+                  fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+                  margin: "0 0 6px",
                 }}>
-                  {stats.pct}%
-                </span>
-              </div>
-            </div>
-
-            {/* Status breakdown bars */}
-            <div style={{ flex: 1 }}>
-              {(["draft", "in_progress", "submitted", "completed"] as const).map((status) => {
-                const cfg = STATUS_CONFIG[status];
-                const count = stats.byStatus[status].length;
-                const barPct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                return (
-                  <div key={status} style={{ marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>{count}</span>
-                    </div>
-                    <div style={{ height: 6, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: 99, background: cfg.color,
-                        width: `${barPct}%`, transition: "width 0.5s ease",
-                        minWidth: barPct > 0 ? 4 : 0,
-                      }} />
-                    </div>
+                  {label}
+                </p>
+                {items.slice(0, 5).map((t) => (
+                  <div key={t._id} style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "4px 0",
+                  }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                      border: "1.5px solid #ccc", background: "#fff",
+                    }} />
+                    <span style={{
+                      fontSize: 13, color: "#333", flex: 1,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {t.title}
+                    </span>
+                    {t.memberName && (
+                      <Avatar name={t.memberName} size={20} />
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Compact number strip */}
-          <div style={{
-            display: "flex", gap: 2, borderTop: "1px solid var(--border)", paddingTop: 14,
-          }}>
-            {[
-              { label: "Total", value: stats.total, color: "var(--text)" },
-              { label: "Done", value: stats.completed, color: "var(--status-success)" },
-              { label: "Submitted", value: stats.byStatus.submitted.length, color: "var(--status-warning)" },
-              { label: "Overdue", value: stats.overdue, color: "var(--status-danger)", hide: stats.overdue === 0 },
-              { label: "Due soon", value: stats.dueSoon, color: "var(--status-warning)", hide: stats.dueSoon === 0 },
-            ].filter((s) => !s.hide).map(({ label, value, color }) => (
-              <div key={label} style={{ flex: 1, textAlign: "center" }}>
-                <p style={{ fontSize: 20, fontWeight: 800, color, margin: 0, lineHeight: 1.2 }}>{value}</p>
-                <p style={{ fontSize: 10, color: "var(--text-muted)", margin: "2px 0 0", fontWeight: 500 }}>{label}</p>
+                ))}
+                {items.length > 5 && (
+                  <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0" }}>
+                    +{items.length - 5} more
+                  </p>
+                )}
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* ── Dates & Timeline ──────────────────────────────────────────── */}
-        <Card title="Timeline" icon={<Clock size={15} style={{ color: "var(--status-info)" }} />}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[
-              { label: "Start date", value: project.startDate ? formatDate(project.startDate) : "—" },
-              { label: "Due date", value: project.dueDate ? formatDate(project.dueDate) : "—" },
-              { label: "Est. completion", value: project.estimatedCompletionDate ? formatDate(project.estimatedCompletionDate) : "—" },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* North Star */}
-          {project.northStar && (
-            <div style={{
-              marginTop: 4, padding: "10px 12px",
-              background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)",
-              borderLeft: "3px solid var(--accent)", borderRadius: 8,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <Target size={11} style={{ color: "var(--accent-light)" }} />
-                <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--accent-light)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  North Star
-                </span>
-              </div>
-              <p style={{ fontSize: 12, color: "var(--text)", margin: 0, lineHeight: 1.4, fontStyle: "italic" }}>
-                &ldquo;{project.northStar}&rdquo;
+            );
+          })}
+          {/* Completed */}
+          {todosByStatus.completed.length > 0 && (
+            <div style={{ marginBottom: 4 }}>
+              <p style={{
+                fontSize: 13, fontWeight: 700, color: "#1a1a1a",
+                margin: "0 0 6px",
+              }}>
+                Completed
               </p>
+              {todosByStatus.completed.slice(0, 3).map((t) => (
+                <div key={t._id} style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "4px 0",
+                }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                    border: "1.5px solid #22c55e", background: "#22c55e",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5.5L4 7.5L8 3" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <span style={{
+                    fontSize: 13, color: "#999",
+                    textDecoration: "line-through",
+                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {t.title}
+                  </span>
+                </div>
+              ))}
+              {todosByStatus.completed.length > 3 && (
+                <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0" }}>
+                  +{todosByStatus.completed.length - 3} more
+                </p>
+              )}
             </div>
+          )}
+          {tasks.length === 0 && (
+            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No tasks yet</p>
           )}
         </Card>
 
-        {/* ── Priority Breakdown ──────────────────────────────────────── */}
-        <Card title="Open by priority" icon={<AlertTriangle size={15} style={{ color: "var(--status-warning)" }} />}>
-          {(["high", "medium", "low"] as const).map((pri) => {
-            const count = stats.byPriority[pri] ?? 0;
-            const openTotal = stats.total - stats.completed;
-            const barPct = openTotal > 0 ? (count / openTotal) * 100 : 0;
-            return (
-              <div key={pri}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: PRIORITY_COLORS[pri], textTransform: "capitalize" }}>{pri}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)" }}>{count}</span>
-                </div>
-                <div style={{ height: 8, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
+        {/* ── Schedule ────────────────────────────────────────────────── */}
+        <Card title="Schedule">
+          {schedule.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No upcoming deadlines</p>
+          ) : (
+            schedule.map((t, i) => {
+              const due = t.dueDate ?? t.submissionDate ?? 0;
+              const isOverdue = due < now;
+              const prevDue = i > 0 ? (schedule[i - 1].dueDate ?? schedule[i - 1].submissionDate ?? 0) : 0;
+              const showDate = i === 0 || formatDate(due, locale) !== formatDate(prevDue, locale);
+
+              return (
+                <div key={t._id}>
+                  {showDate && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      marginTop: i > 0 ? 12 : 0, marginBottom: 6,
+                    }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: isOverdue ? "#ef4444" : "#666",
+                        letterSpacing: "0.02em",
+                      }}>
+                        {isOverdue ? "📅 " : "📅 "}{formatDate(due, locale)}
+                      </span>
+                    </div>
+                  )}
                   <div style={{
-                    height: "100%", borderRadius: 99, background: PRIORITY_COLORS[pri],
-                    width: `${barPct}%`, transition: "width 0.5s ease",
-                    minWidth: barPct > 0 ? 4 : 0,
-                  }} />
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "4px 0 4px 16px",
+                  }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                      border: `1.5px solid ${isOverdue ? "#ef4444" : "#ccc"}`,
+                      background: "#fff",
+                    }} />
+                    <span style={{
+                      fontSize: 13, flex: 1,
+                      color: isOverdue ? "#ef4444" : "#333",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {t.title}
+                    </span>
+                    {t.memberName && <Avatar name={t.memberName} size={20} />}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </Card>
+
+        {/* ── Progress ────────────────────────────────────────────────── */}
+        <Card title="Progress">
+          {/* Big percentage */}
+          <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+            <p style={{
+              fontSize: 48, fontWeight: 800, margin: 0, lineHeight: 1,
+              color: stats.pct === 100 ? "#22c55e" : "#1a1a1a",
+            }}>
+              {stats.pct}%
+            </p>
+            <p style={{ fontSize: 12, color: "#999", margin: "4px 0 0" }}>
+              {stats.completed}/{stats.total} tasks done
+            </p>
+          </div>
+          {/* Progress bar */}
+          <div style={{
+            height: 8, borderRadius: 99, background: "#e5e5e5", overflow: "hidden",
+            marginBottom: 16,
+          }}>
+            <div style={{
+              height: "100%", borderRadius: 99,
+              background: stats.pct === 100 ? "#22c55e" : "#6366f1",
+              width: `${stats.pct}%`, transition: "width 0.5s ease",
+            }} />
+          </div>
+          {/* Stat rows */}
+          {[
+            { label: "Overdue", value: stats.overdue, color: "#ef4444", hide: stats.overdue === 0 },
+            { label: "In progress", value: todosByStatus.in_progress.length, color: "#3b82f6" },
+            { label: "Submitted", value: todosByStatus.submitted.length, color: "#f59e0b" },
+            { label: "To do", value: todosByStatus.draft.length, color: "#999" },
+          ].filter((s) => !s.hide).map(({ label, value, color }) => (
+            <div key={label} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "5px 0",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: "#555" }}>{label}</span>
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{value}</span>
+            </div>
+          ))}
+        </Card>
+
+        {/* ── Activity (like Campfire) ────────────────────────────────── */}
+        <Card title="Activity">
+          {recentActivity.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No activity yet</p>
+          ) : (
+            recentActivity.map((a: any) => (
+              <div key={a._id} style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "6px 0",
+                borderBottom: "1px solid #f0f0f0",
+              }}>
+                <Avatar name={a.memberName ?? "?"} size={26} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                      {a.memberName ?? "Unknown"}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#999" }}>
+                      {formatTime(a.createdAt, locale)}
+                    </span>
+                  </div>
+                  <p style={{
+                    fontSize: 12, color: "#555", margin: "2px 0 0", lineHeight: 1.4,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {a.description}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+
+        {/* ── Team ────────────────────────────────────────────────────── */}
+        <Card title="Team">
+          {members.filter((m) => {
+            return tasks.some((t) => t.memberId === m._id);
+          }).map((m) => {
+            const mTasks = tasks.filter((t) => t.memberId === m._id);
+            const mDone = mTasks.filter((t) => t.status === "completed").length;
+            return (
+              <div key={m._id} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "6px 0",
+                borderBottom: "1px solid #f0f0f0",
+              }}>
+                <Avatar name={m.name} size={30} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontSize: 13, fontWeight: 600, color: "#1a1a1a",
+                    margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {m.name}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#999", margin: "1px 0 0", textTransform: "capitalize" }}>
+                    {m.role}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                    {mDone}/{mTasks.length}
+                  </span>
+                  <p style={{ fontSize: 10, color: "#999", margin: 0 }}>done</p>
                 </div>
               </div>
             );
           })}
+          {members.filter((m) => tasks.some((t) => t.memberId === m._id)).length === 0 && (
+            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No tasks assigned yet</p>
+          )}
         </Card>
 
-        {/* ── Team Workload ──────────────────────────────────────────── */}
-        <Card title="Team workload" icon={<Users size={15} style={{ color: "#8b5cf6" }} />} span={2}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {members
-              .filter((m) => stats.memberWork[m._id])
-              .sort((a, b) => (stats.memberWork[b._id]?.total ?? 0) - (stats.memberWork[a._id]?.total ?? 0))
-              .map((m) => {
-                const w = stats.memberWork[m._id];
-                const memberPct = w.total > 0 ? Math.round((w.done / w.total) * 100) : 0;
-                return (
-                  <div key={m._id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {/* Avatar */}
-                    <div style={{
-                      width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                      background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.25)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 10, fontWeight: 700, color: "var(--accent-light)",
-                    }}>
-                      {initials(m.name)}
-                    </div>
-                    {/* Name */}
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", minWidth: 90 }}>
-                      {m.name}
-                    </span>
-                    {/* Progress bar */}
-                    <div style={{ flex: 1, height: 8, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: 99,
-                        background: memberPct === 100 ? "var(--status-success)" : "var(--accent)",
-                        width: `${memberPct}%`, transition: "width 0.5s ease",
-                        minWidth: memberPct > 0 ? 4 : 0,
-                      }} />
-                    </div>
-                    {/* Stats */}
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", minWidth: 55, textAlign: "right" }}>
-                      {w.done}/{w.total} done
-                    </span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, minWidth: 32, textAlign: "right",
-                      color: memberPct === 100 ? "var(--status-success)" : "var(--text-muted)",
-                    }}>
-                      {memberPct}%
-                    </span>
-                  </div>
-                );
-              })}
-            {members.filter((m) => stats.memberWork[m._id]).length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>No tasks assigned yet</p>
-            )}
+        {/* ── North Star ──────────────────────────────────────────────── */}
+        <Card title="North Star">
+          {project.northStar ? (
+            <div style={{ padding: "8px 0" }}>
+              <p style={{
+                fontSize: 15, color: "#1a1a1a", margin: 0, lineHeight: 1.6,
+                fontStyle: "italic", textAlign: "center",
+              }}>
+                &ldquo;{project.northStar}&rdquo;
+              </p>
+            </div>
+          ) : (
+            <p style={{
+              fontSize: 13, color: "#999", margin: 0, textAlign: "center",
+              padding: "16px 0",
+            }}>
+              No North Star set yet
+            </p>
+          )}
+          {/* Quick timeline info */}
+          <div style={{ borderTop: "1px solid #f0f0f0", marginTop: 12, paddingTop: 12 }}>
+            {[
+              { label: "Start", value: project.startDate },
+              { label: "Due", value: project.dueDate },
+              { label: "Est. completion", value: project.estimatedCompletionDate },
+            ].map(({ label, value }) => (
+              <div key={label} style={{
+                display: "flex", justifyContent: "space-between", padding: "3px 0",
+              }}>
+                <span style={{ fontSize: 12, color: "#999" }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: value ? "#333" : "#ccc" }}>
+                  {value ? formatDate(value, locale) : "—"}
+                </span>
+              </div>
+            ))}
           </div>
         </Card>
       </div>

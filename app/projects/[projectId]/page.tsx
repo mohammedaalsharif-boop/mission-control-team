@@ -930,6 +930,7 @@ export default function ProjectPage() {
             project={project as any}
             tasks={tasks as any}
             members={members as any}
+            projectId={projectId as string}
           />
         )}
 
