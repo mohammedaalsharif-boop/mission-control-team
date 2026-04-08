@@ -40,6 +40,20 @@ export const addComment = mutation({
       createdAt:    now(),
     });
 
+    // Log activity for the project timeline
+    if (task.projectId) {
+      await ctx.db.insert("activities", {
+        orgId:       task.orgId,
+        type:        "comment_added",
+        taskId:      args.taskId,
+        projectId:   task.projectId,
+        memberId:    args.memberId,
+        memberName:  args.memberName,
+        description: `${args.memberName} commented on "${task.title}": ${args.body.trim().slice(0, 80)}`,
+        createdAt:   now(),
+      });
+    }
+
     // Notify task owner about the new comment (unless they wrote it)
     const mentionSet = new Set(args.mentionedIds ?? []);
     if (task.memberId !== args.memberId && !mentionSet.has(task.memberId)) {

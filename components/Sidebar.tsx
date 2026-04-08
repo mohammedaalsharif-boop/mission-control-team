@@ -554,6 +554,22 @@ function SpacesTree({
     ? projects.find((p) => p._id === activeProjectId)?.spaceId
     : null;
 
+  // Eagerly prefetch all project routes (including collapsed spaces)
+  const router = useRouter();
+  useEffect(() => {
+    if (projects.length === 0) return;
+    // Stagger prefetches to avoid a burst of simultaneous requests
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    projects.forEach((p, i) => {
+      timers.push(setTimeout(() => router.prefetch(`/projects/${p._id}`), i * 50));
+    });
+    // Also prefetch space pages
+    spaces.forEach((s, i) => {
+      timers.push(setTimeout(() => router.prefetch(`/spaces/${s._id}`), (projects.length + i) * 50));
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [projects, spaces, router]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {/* Section label */}
@@ -696,7 +712,7 @@ function SpacesTree({
 
                   return (
                     <div key={project._id} className="sb-project-row" data-active={isActive ? "true" : undefined}>
-                      <Link href={href} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+                      <Link href={href} prefetch={true} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
                         {dot}
                         <span className="sb-project-name" data-active={isActive ? "true" : undefined}>
                           {project.name}
@@ -1769,7 +1785,7 @@ export default function Sidebar() {
           {primaryLinks.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
             return (
-              <Link key={href} href={href} style={{ textDecoration: "none" }}>
+              <Link key={href} href={href} prefetch={true} style={{ textDecoration: "none" }}>
                 <div className="sb-link" data-active={isActive ? "true" : undefined}>
                   <Icon size={16} strokeWidth={1.8} className="sb-link-icon" />
                   <span className="sb-link-label">{label}</span>
@@ -1791,7 +1807,7 @@ export default function Sidebar() {
                   const href = `/projects/${p._id}`;
                   const isActive = pathname === href || pathname.startsWith(`${href}/`);
                   return (
-                    <Link key={p._id} href={href} style={{ textDecoration: "none" }}>
+                    <Link key={p._id} href={href} prefetch={true} style={{ textDecoration: "none" }}>
                       <div className="sb-fav-row" data-active={isActive ? "true" : undefined}>
                         <Star size={12} fill="currentColor" className="sb-fav-star" />
                         <span className="sb-fav-name">{p.name}</span>
@@ -1816,7 +1832,7 @@ export default function Sidebar() {
               {adminTools.map(({ href, label, icon: Icon }) => {
                 const isActive = pathname === href;
                 return (
-                  <Link key={href} href={href} style={{ textDecoration: "none" }}>
+                  <Link key={href} href={href} prefetch={true} style={{ textDecoration: "none" }}>
                     <button className="sb-dock-btn" data-active={isActive ? "true" : undefined} title={label}>
                       <Icon size={15} strokeWidth={1.8} />
                     </button>

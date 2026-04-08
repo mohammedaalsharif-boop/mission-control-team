@@ -740,6 +740,7 @@ const ar: Translations = {
     low: "منخفضة",
     doneCount: "مكتمل",
     spaces: "المساحات",
+    activity: "النشاط",
   },
 
   // ── Space Detail Page ─────────────────────────────────────────────

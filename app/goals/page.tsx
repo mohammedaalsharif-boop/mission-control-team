@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Target, Plus, ChevronDown, ChevronRight, Trash2, Edit2, Link2, X, Check } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Target, Plus, ChevronDown, ChevronRight, Trash2, Edit2, Link2, X, Check, Map, List, Compass, ArrowRight } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -32,6 +32,7 @@ export default function GoalsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", color: "#6366f1" });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"list" | "alignment">("alignment");
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
@@ -68,17 +69,51 @@ export default function GoalsPage() {
             {goals.length} goal{goals.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <button
-          onClick={() => setCreating(!creating)}
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-            background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          <Plus size={13} /> {t.goals.newGoal}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* View toggle */}
+          <div style={{
+            display: "flex", background: "var(--surface2)", borderRadius: 8,
+            border: "1px solid var(--border)", padding: 2, gap: 2,
+          }}>
+            <button
+              onClick={() => setView("alignment")}
+              title="Alignment Map"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 28, borderRadius: 6, border: "none", cursor: "pointer",
+                background: view === "alignment" ? "var(--accent)" : "transparent",
+                color: view === "alignment" ? "#fff" : "var(--text-dim)",
+                transition: "all 0.15s",
+              }}
+            >
+              <Map size={13} />
+            </button>
+            <button
+              onClick={() => setView("list")}
+              title="List View"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 28, borderRadius: 6, border: "none", cursor: "pointer",
+                background: view === "list" ? "var(--accent)" : "transparent",
+                color: view === "list" ? "#fff" : "var(--text-dim)",
+                transition: "all 0.15s",
+              }}
+            >
+              <List size={13} />
+            </button>
+          </div>
+          <button
+            onClick={() => setCreating(!creating)}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            <Plus size={13} /> {t.goals.newGoal}
+          </button>
+        </div>
       </div>
 
       {/* Create form */}
@@ -152,22 +187,32 @@ export default function GoalsPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {goals.map((goal) => (
-          <GoalCard
-            key={goal._id}
-            goal={goal}
-            expanded={expanded.has(goal._id)}
-            onToggle={() => toggleExpand(goal._id)}
-            projects={projects}
-            members={members}
-            onUpdate={updateGoal}
-            onRemove={removeGoal}
-            onLink={linkProject}
-            onUnlink={unlinkProject}
-          />
-        ))}
-      </div>
+      {view === "list" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {goals.map((goal) => (
+            <GoalCard
+              key={goal._id}
+              goal={goal}
+              expanded={expanded.has(goal._id)}
+              onToggle={() => toggleExpand(goal._id)}
+              projects={projects}
+              members={members}
+              onUpdate={updateGoal}
+              onRemove={removeGoal}
+              onLink={linkProject}
+              onUnlink={unlinkProject}
+            />
+          ))}
+        </div>
+      ) : (
+        <AlignmentMap
+          goals={goals}
+          projects={projects}
+          members={members}
+          onLink={linkProject}
+          onUnlink={unlinkProject}
+        />
+      )}
     </div>
   );
 }
@@ -219,7 +264,7 @@ function GoalCard({
       borderRadius: 10, overflow: "hidden",
       borderLeft: `3px solid ${goal.color ?? "var(--accent)"}`,
     }}>
-      {/* Header */}
+      {/* Header — list view */}
       <div
         onClick={onToggle}
         style={{
@@ -397,6 +442,363 @@ function GoalCard({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Alignment Map ──────────────────────────────────────────────────────── */
+
+function AlignmentMap({
+  goals, projects, members, onLink, onUnlink,
+}: {
+  goals: any[];
+  projects: any[];
+  members: any[];
+  onLink: any;
+  onUnlink: any;
+}) {
+  const { t } = useLocale();
+
+  if (goals.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Legend */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 16,
+        padding: "10px 14px", borderRadius: 8,
+        background: "var(--surface2)", border: "1px solid var(--border)",
+        fontSize: 11, color: "var(--text-muted)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <Target size={12} style={{ color: "var(--accent-light)" }} />
+          <span>Goal</span>
+        </div>
+        <ArrowRight size={10} style={{ color: "var(--text-dim)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <Compass size={12} style={{ color: "var(--status-success)" }} />
+          <span>Linked Project (North Star)</span>
+        </div>
+      </div>
+
+      {/* Goal nodes */}
+      {goals.map((goal) => (
+        <AlignmentGoalNode
+          key={goal._id}
+          goal={goal}
+          allProjects={projects}
+          members={members}
+          onLink={onLink}
+          onUnlink={onUnlink}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ── Alignment Goal Node (card tree) ────────────────────────────────────── */
+
+function AlignmentGoalNode({
+  goal, allProjects, members, onLink, onUnlink,
+}: {
+  goal: any;
+  allProjects: any[];
+  members: any[];
+  onLink: any;
+  onUnlink: any;
+}) {
+  const { t } = useLocale();
+  const progress     = useQuery(api.goals.getProgress, { goalId: goal._id });
+  const goalProjects = useQuery(api.goals.getGoalProjects, { goalId: goal._id }) ?? [];
+  const [linking, setLinking] = useState(false);
+
+  const stMap = STATUS_MAP[goal.status] ?? STATUS_MAP.on_track;
+  const pct   = progress?.pct ?? 0;
+  const owner = goal.ownerId ? members.find((m: any) => m._id === goal.ownerId) : null;
+  const linkedProjectIds = new Set(goalProjects.map((gp: any) => gp?.project._id));
+  const availableProjects = allProjects.filter((p) => !linkedProjectIds.has(p._id));
+
+  return (
+    <div style={{ position: "relative" }}>
+      {/* ── Goal card (parent node) ── */}
+      <div style={{
+        background: "var(--surface2)",
+        border: "1px solid var(--border2)",
+        borderRadius: 12,
+        borderLeft: `3px solid ${goal.color ?? "var(--accent)"}`,
+        padding: "16px 18px",
+        position: "relative",
+        zIndex: 1,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          {/* Goal icon */}
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: goal.color ? `${goal.color}18` : "var(--accent-bg)",
+            border: `1px solid ${goal.color ? `${goal.color}30` : "var(--accent-border)"}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Target size={16} style={{ color: goal.color ?? "var(--accent-light)" }} />
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" }}>
+                {goal.title}
+              </span>
+              <span style={{
+                fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
+                background: stMap.bg, color: stMap.color, textTransform: "uppercase",
+                letterSpacing: "0.04em",
+              }}>
+                {stMap.label}
+              </span>
+            </div>
+            {goal.description && (
+              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.5, marginBottom: 6 }}>
+                {goal.description}
+              </p>
+            )}
+            {/* Stats row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11, color: "var(--text-dim)" }}>
+              <span>{progress?.totalTasks ?? 0} tasks</span>
+              <span>{progress?.completedTasks ?? 0} done</span>
+              {goal.dueDate && (
+                <span>Due {new Date(goal.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              )}
+              {owner && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{
+                    width: 16, height: 16, borderRadius: "50%",
+                    background: "var(--accent-bg)", border: "1px solid var(--accent-border)",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 7, fontWeight: 700, color: "var(--accent-light)",
+                  }}>
+                    {owner.name?.[0]?.toUpperCase() ?? "?"}
+                  </span>
+                  {owner.name?.split(" ")[0]}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Progress ring */}
+          <div style={{
+            width: 48, height: 48, position: "relative", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width={48} height={48} viewBox="0 0 48 48">
+              <circle cx={24} cy={24} r={20} fill="none"
+                stroke="var(--surface3)" strokeWidth={3} />
+              <circle cx={24} cy={24} r={20} fill="none"
+                stroke={pct === 100 ? "var(--status-success)" : (goal.color ?? "var(--accent)")}
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeDasharray={`${(pct / 100) * 125.6} 125.6`}
+                transform="rotate(-90 24 24)"
+                style={{ transition: "stroke-dasharray 0.4s ease" }}
+              />
+            </svg>
+            <span style={{
+              position: "absolute", fontSize: 11, fontWeight: 700,
+              color: pct === 100 ? "var(--status-success)" : "var(--text)",
+            }}>
+              {pct}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Connector line + child project cards ── */}
+      {(goalProjects.length > 0 || linking) && (
+        <div style={{
+          position: "relative",
+          marginLeft: 34,
+          paddingLeft: 24,
+          borderLeft: `2px solid ${goal.color ? `${goal.color}40` : "var(--accent-border)"}`,
+        }}>
+          {goalProjects.map((gp: any, idx: number) => {
+            if (!gp) return null;
+            const proj   = gp.project;
+            const stats  = gp.taskStats;
+            const statusColor =
+              proj.status === "active" ? "var(--status-success)"
+              : proj.status === "on_hold" ? "var(--status-warning)"
+              : proj.status === "completed" ? "var(--accent-light)"
+              : "var(--text-dim)";
+
+            return (
+              <div key={gp.link._id} style={{ position: "relative", paddingTop: 12, paddingBottom: idx === goalProjects.length - 1 && !linking ? 4 : 0 }}>
+                {/* Horizontal connector arm */}
+                <div style={{
+                  position: "absolute", top: 30, left: 0, width: 24, height: 2,
+                  background: goal.color ? `${goal.color}40` : "var(--accent-border)",
+                }} />
+
+                {/* Project card */}
+                <div style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  transition: "border-color 0.15s, box-shadow 0.15s",
+                  cursor: "default",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = goal.color ?? "var(--accent-border)";
+                  e.currentTarget.style.boxShadow = `0 0 0 1px ${goal.color ? `${goal.color}20` : "var(--accent-subtle)"}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    {/* Status dot */}
+                    <div style={{
+                      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      background: statusColor, marginTop: 4,
+                    }} />
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                          {proj.name}
+                        </span>
+                        <span style={{
+                          fontSize: 9, fontWeight: 500, color: statusColor,
+                          textTransform: "uppercase", letterSpacing: "0.03em",
+                        }}>
+                          {proj.status?.replace("_", " ")}
+                        </span>
+                      </div>
+
+                      {/* North Star */}
+                      {proj.northStar && (
+                        <p style={{
+                          fontSize: 11, color: "var(--text-muted)", margin: "3px 0 0",
+                          lineHeight: 1.4, fontStyle: "italic",
+                          display: "flex", alignItems: "center", gap: 4,
+                        }}>
+                          <Compass size={10} style={{ color: "var(--accent-muted)", flexShrink: 0 }} />
+                          {proj.northStar}
+                        </p>
+                      )}
+
+                      {/* Task progress */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                        <div style={{
+                          flex: 1, maxWidth: 140, height: 4, borderRadius: 2,
+                          background: "var(--surface3)", overflow: "hidden",
+                        }}>
+                          <div style={{
+                            height: "100%", borderRadius: 2,
+                            background: stats.pct === 100 ? "var(--status-success)" : (goal.color ?? "var(--accent)"),
+                            width: `${stats.pct}%`,
+                            transition: "width 0.3s",
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 500 }}>
+                          {stats.completed}/{stats.total} tasks ({stats.pct}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Unlink button */}
+                    <button
+                      onClick={() => onUnlink({ linkId: gp.link._id })}
+                      title="Unlink project"
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: "var(--text-dim)", padding: 4, display: "flex",
+                        borderRadius: 4, transition: "color 0.1s, background 0.1s",
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "var(--status-danger)";
+                        e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "var(--text-dim)";
+                        e.currentTarget.style.background = "none";
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Link project inline selector */}
+          {linking && (
+            <div style={{ paddingTop: 12, paddingBottom: 4, position: "relative" }}>
+              <div style={{
+                position: "absolute", top: 30, left: 0, width: 24, height: 2,
+                background: goal.color ? `${goal.color}40` : "var(--accent-border)",
+              }} />
+              <div style={{ display: "flex", gap: 6 }}>
+                <select
+                  autoFocus
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      onLink({ goalId: goal._id, projectId: e.target.value as Id<"projects"> });
+                      setLinking(false);
+                    }
+                  }}
+                  onBlur={() => setLinking(false)}
+                  style={{
+                    flex: 1, padding: "7px 10px", fontSize: 12,
+                    background: "var(--surface)", border: "1px solid var(--border2)",
+                    borderRadius: 8, color: "var(--text)", fontFamily: "inherit",
+                  }}
+                >
+                  <option value="">Select a project to link...</option>
+                  {availableProjects.map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+                <button onClick={() => setLinking(false)} style={{
+                  background: "var(--surface3)", border: "none", borderRadius: 6,
+                  padding: "0 10px", cursor: "pointer", color: "var(--text-dim)",
+                  display: "flex", alignItems: "center",
+                }}>
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Link project button (always visible) */}
+      <div style={{ marginLeft: 34, paddingLeft: 24, paddingTop: goalProjects.length > 0 ? 0 : 8 }}>
+        {!linking && (
+          <button
+            onClick={() => setLinking(true)}
+            style={{
+              fontSize: 11, fontWeight: 500,
+              color: goal.color ?? "var(--accent-light)",
+              background: "none", border: `1px dashed ${goal.color ? `${goal.color}40` : "var(--accent-border)"}`,
+              borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+              fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = goal.color ? `${goal.color}10` : "var(--accent-subtle)";
+              e.currentTarget.style.borderColor = goal.color ?? "var(--accent-muted)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none";
+              e.currentTarget.style.borderColor = goal.color ? `${goal.color}40` : "var(--accent-border)";
+            }}
+          >
+            <Link2 size={10} /> Link a project
+          </button>
+        )}
+      </div>
     </div>
   );
 }

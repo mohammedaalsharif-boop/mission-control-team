@@ -12,11 +12,12 @@ import TaskCard from "@/components/tasks/TaskCard";
 import {
   Plus, ChevronRight, ChevronLeft, X,
   LayoutGrid, List, Users, Search,
-  Calendar, AlertTriangle, Sparkles, Pencil, UserCircle2, ChevronDown,
+  Calendar, AlertTriangle, Sparkles, Pencil, UserCircle2, ChevronDown, Activity,
 } from "lucide-react";
 import { TeamTask } from "@/lib/task-types";
 import ListView from "@/components/tasks/ListView";
 import ProjectCalendar from "@/components/tasks/ProjectCalendar";
+import ProjectTimeline from "@/components/tasks/ProjectTimeline";
 
 const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", dueDate: "", visibility: "public" };
 
@@ -344,6 +345,10 @@ export default function ProjectPage() {
     orgId && user?.memberId ? { projectId, viewerId: user.memberId as Id<"members"> } : "skip"
   ) ?? [];
   const members = useQuery(api.members.listMembers, orgId ? { orgId } : "skip") ?? [];
+  const activities = useQuery(
+    api.tasks.getProjectActivities,
+    orgId ? { projectId } : "skip"
+  ) ?? [];
 
   const createTask     = useMutation(api.tasks.createTask);
   const moveTask       = useMutation(api.tasks.updateTaskStatus);
@@ -366,7 +371,7 @@ export default function ProjectPage() {
     { value: "low",    label: t.projectPage.low,    color: "var(--status-success)" },
   ];
 
-  const [view,            setView]            = useState<"kanban" | "list" | "calendar">("kanban");
+  const [view,            setView]            = useState<"kanban" | "list" | "calendar" | "activity">("kanban");
   const [addingCol,       setAddingCol]       = useState<string | null>(null);
   const [form,            setForm]            = useState(EMPTY_FORM);
   const [dragOver,        setDragOver]        = useState<string | null>(null);
@@ -686,6 +691,7 @@ export default function ProjectPage() {
                 { id: "kanban",   icon: <LayoutGrid size={13} />, label: t.projectPage.kanban   },
                 { id: "list",     icon: <List       size={13} />, label: t.projectPage.list     },
                 { id: "calendar", icon: <Calendar   size={13} />, label: t.projectPage.calendar },
+                { id: "activity", icon: <Activity   size={13} />, label: t.projectPage.activity ?? "Activity" },
               ] as const).map((v) => (
                 <button
                   key={v.id}
@@ -916,6 +922,11 @@ export default function ProjectPage() {
           </div>
         )}
 
+        {/* Activity timeline view */}
+        {view === "activity" && (
+          <ProjectTimeline activities={activities as any} />
+        )}
+
         {/* Calendar view */}
         {view === "calendar" && (
           <ProjectCalendar
@@ -950,7 +961,7 @@ export default function ProjectPage() {
         )}
 
         {/* Kanban board */}
-        <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: view === "kanban" ? undefined : "none" }}>
+        <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: view === "kanban" ? "flex" : "none", flexDirection: "column" }}>
           <div style={{
             display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
             gap: 1, height: "100%", minWidth: 800,

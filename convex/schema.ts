@@ -247,7 +247,8 @@ export default defineSchema({
     createdAt:   v.number(),
   })
     .index("by_created", ["createdAt"])
-    .index("by_org",     ["orgId"]),
+    .index("by_org",     ["orgId"])
+    .index("by_project", ["projectId"]),
 
   // ── Task dependencies (blocking chains) ──────────────────────────────────────
   // "blockerTaskId blocks dependentTaskId" — dependentTaskId can't start until blockerTaskId is done

@@ -258,6 +258,22 @@ export const addMember = mutation({
       .first();
     if (existing) return;
     await ctx.db.insert("projectMembers", { projectId, memberId, addedAt: now() });
+
+    // Log activity
+    const project = await ctx.db.get(projectId);
+    const member = await ctx.db.get(memberId);
+    if (project && member) {
+      const caller = project.orgId ? await getCallerMember(ctx, project.orgId) : null;
+      await ctx.db.insert("activities", {
+        orgId:       project.orgId,
+        type:        "member_added",
+        projectId,
+        memberId:    caller?._id ?? memberId,
+        memberName:  caller?.name,
+        description: `${caller?.name ?? "Someone"} added ${member.name} to the project`,
+        createdAt:   now(),
+      });
+    }
   },
 });
 
@@ -272,6 +288,24 @@ export const removeMember = mutation({
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .filter((q) => q.eq(q.field("memberId"), memberId))
       .first();
-    if (record) await ctx.db.delete(record._id);
+    if (record) {
+      await ctx.db.delete(record._id);
+
+      // Log activity
+      const project = await ctx.db.get(projectId);
+      const member = await ctx.db.get(memberId);
+      if (project && member) {
+        const caller = project.orgId ? await getCallerMember(ctx, project.orgId) : null;
+        await ctx.db.insert("activities", {
+          orgId:       project.orgId,
+          type:        "member_removed",
+          projectId,
+          memberId:    caller?._id ?? memberId,
+          memberName:  caller?.name,
+          description: `${caller?.name ?? "Someone"} removed ${member.name} from the project`,
+          createdAt:   now(),
+        });
+      }
+    }
   },
 });
