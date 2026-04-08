@@ -86,7 +86,17 @@ export const removeMember = mutation({
       }
     }
 
+    // ── Count tasks that belong to this member (never delete them) ─────────
+    const memberTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_member", (q) => q.eq("memberId", memberId))
+      .take(500);
+    const openTasks = memberTasks.filter(
+      (t) => t.status !== "completed"
+    );
+
     await ctx.db.delete(memberId);
+
     await ctx.db.insert("activities", {
       orgId,
       type:        "member_removed",
@@ -95,6 +105,28 @@ export const removeMember = mutation({
       description: `Removed team member: ${member.name}`,
       createdAt:   now(),
     });
+
+    // ── Notify all admins to reassign open tasks ────────────────────────
+    if (openTasks.length > 0) {
+      const admins = await ctx.db
+        .query("members")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect();
+      for (const admin of admins) {
+        if (admin.role === "admin" || admin.role === "manager") {
+          await ctx.db.insert("notifications", {
+            orgId,
+            type:        "reassign_tasks",
+            title:       "Tasks Need Reassignment",
+            message:     `${member.name} was removed and has ${openTasks.length} open task${openTasks.length > 1 ? "s" : ""} that need to be reassigned.`,
+            forRole:     admin.role,
+            forMemberId: admin._id,
+            read:        false,
+            createdAt:   now(),
+          });
+        }
+      }
+    }
   },
 });
 

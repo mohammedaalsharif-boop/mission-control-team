@@ -146,7 +146,7 @@ export default function TaskCard({
       )}
 
       <div
-        draggable={isOwn}
+        draggable={isOwn || isAdmin}
         onDragStart={(e) => {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";

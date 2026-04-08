@@ -4,7 +4,8 @@ import { internal } from "./_generated/api";
 import { getCallerMember, requireAdmin, requirePermission } from "./helpers";
 
 const now = () => Date.now();
-const INVITE_EXPIRY_DAYS = 7;
+// Invites never expire — set to 100 years
+const INVITE_EXPIRY_DAYS = 36500;
 
 /** Generate a cryptographically-random-ish token (good enough for invites). */
 function generateToken(): string {
@@ -40,10 +41,10 @@ export const createInvite = mutation({
       .query("invites")
       .withIndex("by_org_and_email", (q) => q.eq("orgId", orgId).eq("email", normalised))
       .first();
-    if (existingInvite && existingInvite.status === "pending" && existingInvite.expiresAt > now()) {
-      throw new Error("An invite has already been sent to this email. It has not yet expired.");
+    if (existingInvite && existingInvite.status === "pending") {
+      throw new Error("An invite has already been sent to this email.");
     }
-    // If there's an expired invite, delete it so we can create a fresh one
+    // If there's an old invite (accepted/expired), delete it so we can create a fresh one
     if (existingInvite) {
       await ctx.db.delete(existingInvite._id);
     }
@@ -125,7 +126,7 @@ export const getInviteByToken = query({
       orgId:     invite.orgId,
       orgName:   org?.name ?? "Unknown",
       expiresAt: invite.expiresAt,
-      expired:   invite.expiresAt < Date.now(),
+      expired:   false,
     };
   },
 });
@@ -141,10 +142,6 @@ export const acceptInvite = mutation({
 
     if (!invite) throw new Error("Invite not found.");
     if (invite.status !== "pending") throw new Error("This invite has already been used.");
-    if (invite.expiresAt < now()) {
-      await ctx.db.patch(invite._id, { status: "expired" });
-      throw new Error("This invite has expired. Ask your admin to send a new one.");
-    }
 
     // Verify the authenticated user matches the invite email
     const identity = await ctx.auth.getUserIdentity();
