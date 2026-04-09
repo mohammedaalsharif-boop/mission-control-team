@@ -113,7 +113,11 @@ export default function TaskCard({
   const dueEndOfDay = task.submissionDate ? new Date(task.submissionDate) : null;
   if (dueEndOfDay) dueEndOfDay.setHours(23, 59, 59, 999);
   const isOverdue = isActive && dueEndOfDay !== null && dueEndOfDay.getTime() < now;
-  const isDueSoon = isActive && dueDiff !== null && !isOverdue && dueDiff >= 0 && dueDiff <= msInDay;
+  // "Due Today" = the due date falls on today's calendar date
+  const isDueToday = isActive && !isOverdue && task.submissionDate !== undefined &&
+    task.submissionDate.toDateString() === new Date().toDateString();
+  // "Due Soon" = within 24h but not today and not overdue
+  const isDueSoon = isActive && !isOverdue && !isDueToday && dueDiff !== null && dueDiff >= 0 && dueDiff <= msInDay;
 
   const initials = task.memberName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -123,8 +127,9 @@ export default function TaskCard({
 
   /* Left-border accent — status stripe */
   const accentColor =
-    isOverdue  ? "var(--status-danger)" :
-    isDueSoon  ? "var(--status-warning)" :
+    isOverdue   ? "var(--status-danger)" :
+    isDueToday  ? "#6366f1" :
+    isDueSoon   ? "var(--status-warning)" :
     task.status === "submitted" ? "var(--status-warning)" :
     task.status === "in_progress" ? "var(--status-info)" :
     task.status === "completed" ? "var(--status-success)" :
@@ -164,9 +169,10 @@ export default function TaskCard({
           position:     "relative",
           background:   "var(--surface2)",
           border:       `1px solid ${
-            isOverdue  ? "rgba(239,68,68,0.35)"  :
-            isDueSoon  ? "rgba(245,158,11,0.35)" :
-            hovered    ? "var(--border3)"         : "var(--border2)"
+            isOverdue   ? "rgba(239,68,68,0.35)"  :
+            isDueToday  ? "rgba(99,102,241,0.4)"  :
+            isDueSoon   ? "rgba(245,158,11,0.35)" :
+            hovered     ? "var(--border3)"         : "var(--border2)"
           }`,
           borderLeft:   `3px solid ${accentColor}`,
           borderRadius: 10,
@@ -272,25 +278,45 @@ export default function TaskCard({
         {task.submissionDate && task.status !== "completed" && (
           <div style={{
             display: "flex", alignItems: "center", gap: 5, marginBottom: 8,
-            ...(isOverdue || isDueSoon ? {
-              background:   isOverdue ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.06)",
-              border:       isOverdue ? "1px solid rgba(239,68,68,0.15)" : "1px solid rgba(245,158,11,0.15)",
-              borderRadius: 5, padding: "3px 7px",
-            } : {}),
+            borderRadius: 6, padding: "4px 8px",
+            ...(isOverdue ? {
+              background: "rgba(239,68,68,0.06)",
+              border: "1px solid rgba(239,68,68,0.15)",
+            } : isDueToday ? {
+              background: "rgba(99,102,241,0.08)",
+              border: "1px solid rgba(99,102,241,0.2)",
+            } : isDueSoon ? {
+              background: "rgba(245,158,11,0.06)",
+              border: "1px solid rgba(245,158,11,0.15)",
+            } : {
+              background: "transparent",
+              border: "1px solid transparent",
+            }),
           }}>
-            {(isOverdue || isDueSoon) && (
-              <AlertTriangle size={10} style={{ color: isOverdue ? "var(--status-danger)" : "var(--status-warning)", flexShrink: 0 }} />
+            {isOverdue && (
+              <AlertTriangle size={10} style={{ color: "var(--status-danger)", flexShrink: 0 }} />
+            )}
+            {isDueToday && (
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" stroke="#6366f1" strokeWidth="2" />
+                <path d="M12 6v6l4 2" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            {isDueSoon && (
+              <AlertTriangle size={10} style={{ color: "var(--status-warning)", flexShrink: 0 }} />
             )}
             <span style={{
               fontSize: 10.5,
-              color: isOverdue ? "var(--status-danger)" : isDueSoon ? "var(--status-warning)" : "var(--text-muted)",
-              fontWeight: (isOverdue || isDueSoon) ? 600 : 400,
+              color: isOverdue ? "var(--status-danger)" : isDueToday ? "#6366f1" : isDueSoon ? "var(--status-warning)" : "var(--text-muted)",
+              fontWeight: (isOverdue || isDueToday || isDueSoon) ? 600 : 400,
             }}>
               {isOverdue
                 ? `${t.taskCard.overdue} \u00b7 ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                : isDueSoon
-                  ? `${t.taskCard.dueToday} \u00b7 ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                  : `${t.taskCard.due} ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : isDueToday
+                  ? `${t.taskCard.dueToday} \u00b7 Today`
+                  : isDueSoon
+                    ? `${t.taskCard.dueToday} \u00b7 ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                    : `${t.taskCard.due} ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
               }
             </span>
           </div>
