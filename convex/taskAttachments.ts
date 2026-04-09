@@ -65,6 +65,51 @@ export const listByTask = query({
   },
 });
 
+// ── List all attachments for every task in a project ──────────────────────────
+export const listByProject = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    // Gather all tasks belonging to this project
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .take(500);
+
+    const allAttachments: Array<{
+      _id: any;
+      taskId: any;
+      storageId: any;
+      fileName: string;
+      contentType: string;
+      size: number;
+      uploadedBy: any;
+      uploadedAt: number;
+      url: string | null;
+      taskTitle: string;
+    }> = [];
+
+    for (const task of tasks) {
+      const attachments = await ctx.db
+        .query("taskAttachments")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .order("desc")
+        .take(20);
+
+      for (const a of attachments) {
+        allAttachments.push({
+          ...a,
+          url: await ctx.storage.getUrl(a.storageId),
+          taskTitle: task.title,
+        });
+      }
+    }
+
+    // Sort by upload date descending, limit to 50
+    allAttachments.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    return allAttachments.slice(0, 50);
+  },
+});
+
 // ── Delete an attachment (owner, admin, or manager) ─────────────────────────
 export const deleteAttachment = mutation({
   args: { attachmentId: v.id("taskAttachments") },

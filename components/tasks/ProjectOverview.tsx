@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useLocale } from "@/components/LocaleProvider";
@@ -42,6 +43,7 @@ interface Props {
   tasks: Task[];
   members: Member[];
   projectId: string;
+  onSwitchView?: (view: string) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,13 +55,25 @@ function initials(name: string): string {
 function formatDate(ts: number, locale: string): string {
   return new Date(ts).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
     weekday: "short", month: "short", day: "numeric",
-  }).toUpperCase();
+  });
 }
 
-function formatTime(ts: number, locale: string): string {
-  return new Date(ts).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US", {
-    hour: "numeric", minute: "2-digit",
-  }).toLowerCase();
+function formatRelative(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const AVATAR_COLORS = [
@@ -73,30 +87,80 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+function fileIcon(contentType: string): string {
+  if (contentType.startsWith("image/")) return "🖼️";
+  if (contentType.includes("pdf")) return "📄";
+  if (contentType.includes("spreadsheet") || contentType.includes("excel")) return "📊";
+  if (contentType.includes("presentation") || contentType.includes("powerpoint")) return "📑";
+  if (contentType.includes("word") || contentType.includes("document")) return "📝";
+  if (contentType.includes("zip") || contentType.includes("archive")) return "📦";
+  if (contentType.includes("video")) return "🎬";
+  if (contentType.includes("audio")) return "🎵";
+  return "📎";
+}
+
 // ── Card shell ───────────────────────────────────────────────────────────────
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({
+  title,
+  children,
+  onClick,
+  count,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  count?: number;
+}) {
   return (
-    <div style={{
-      border: "1px solid #e0e0e0",
-      borderRadius: 6,
-      background: "#fff",
-      display: "flex",
-      flexDirection: "column",
-      minHeight: 260,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        background: "var(--surface)",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 260,
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
+          e.currentTarget.style.borderColor = "var(--accent-muted)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.borderColor = "var(--border)";
+      }}
+    >
       {/* Card title */}
       <div style={{
-        borderBottom: "1px solid #e0e0e0",
+        borderBottom: "1px solid var(--border)",
         padding: "14px 18px",
         textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
       }}>
         <h3 style={{
-          fontSize: 16, fontWeight: 700, color: "#1a1a1a",
+          fontSize: 16, fontWeight: 700, color: "var(--text)",
           margin: 0, letterSpacing: "-0.01em",
         }}>
           {title}
         </h3>
+        {count !== undefined && count > 0 && (
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+            background: "var(--surface2)", padding: "2px 8px",
+            borderRadius: 10,
+          }}>
+            {count}
+          </span>
+        )}
       </div>
       {/* Card body */}
       <div style={{ flex: 1, padding: "12px 18px", overflowY: "auto" }}>
@@ -122,15 +186,93 @@ function Avatar({ name, size = 28 }: { name: string; size?: number }) {
   );
 }
 
+// ── Task row (shared between To-dos and Schedule) ───────────────────────────
+
+function TaskRow({
+  task,
+  isCompleted,
+  isOverdue,
+  showAssignee,
+  onClick,
+}: {
+  task: Task;
+  isCompleted?: boolean;
+  isOverdue?: boolean;
+  showAssignee?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
+      style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "5px 4px",
+        borderRadius: 6,
+        cursor: onClick ? "pointer" : "default",
+        transition: "background 0.1s",
+      }}
+      onMouseEnter={(e) => { if (onClick) e.currentTarget.style.background = "var(--surface2)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+        border: isCompleted ? "1.5px solid #22c55e" : `1.5px solid ${isOverdue ? "#ef4444" : "var(--border)"}`,
+        background: isCompleted ? "#22c55e" : "var(--surface)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {isCompleted && (
+          <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+            <path d="M2 5.5L4 7.5L8 3" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </div>
+      <span style={{
+        fontSize: 13, flex: 1,
+        color: isCompleted ? "var(--text-muted)" : isOverdue ? "#ef4444" : "var(--text)",
+        textDecoration: isCompleted ? "line-through" : "none",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {task.title}
+      </span>
+      {showAssignee && task.memberName && (
+        <Avatar name={task.memberName} size={20} />
+      )}
+    </div>
+  );
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ text, icon }: { text: string; icon: string }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", padding: "32px 16px", gap: 8,
+    }}>
+      <span style={{ fontSize: 28, opacity: 0.5 }}>{icon}</span>
+      <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, textAlign: "center" }}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjectOverview({ project, tasks, members, projectId }: Props) {
+export default function ProjectOverview({ project, tasks, members, projectId, onSwitchView }: Props) {
   const { locale } = useLocale();
+  const router = useRouter();
   const now = Date.now();
 
-  // Fetch comments and activities for this project
+  // Fetch activities for this project
   const activities = useQuery(
     api.tasks.getProjectActivities,
+    { projectId: projectId as Id<"projects"> },
+  ) ?? [];
+
+  // Fetch attachments for this project
+  const attachments = useQuery(
+    api.taskAttachments.listByProject,
     { projectId: projectId as Id<"projects"> },
   ) ?? [];
 
@@ -185,7 +327,7 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
   return (
     <div style={{
       flex: 1, overflowY: "auto",
-      background: "#f6f6f4",
+      background: "var(--bg)",
     }}>
       {/* ── Header area ─────────────────────────────────────────────────── */}
       <div style={{
@@ -193,13 +335,13 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
         padding: "32px 28px 24px",
       }}>
         <h1 style={{
-          fontSize: 28, fontWeight: 800, color: "#1a1a1a",
+          fontSize: 28, fontWeight: 800, color: "var(--text)",
           margin: 0, letterSpacing: "-0.02em",
         }}>
           {project.name}
         </h1>
         {project.description && (
-          <p style={{ fontSize: 14, color: "#666", margin: "6px 0 0" }}>
+          <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "6px 0 0" }}>
             {project.description}
           </p>
         )}
@@ -219,7 +361,7 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
                 <div style={{
                   width: 38, height: 38, borderRadius: "50%",
                   background: avatarColor(m.name),
-                  border: "2px solid #f6f6f4",
+                  border: "2px solid var(--bg)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 13, fontWeight: 700, color: "#fff",
                   cursor: "default",
@@ -243,7 +385,11 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
       }}>
 
         {/* ── To-dos ──────────────────────────────────────────────────── */}
-        <Card title="To-dos">
+        <Card
+          title="To-dos"
+          count={tasks.filter((t) => t.status !== "completed").length}
+          onClick={() => onSwitchView?.("kanban")}
+        >
           {(["draft", "in_progress", "submitted"] as const).map((status) => {
             const items = todosByStatus[status];
             if (items.length === 0) return null;
@@ -253,33 +399,26 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
             return (
               <div key={status} style={{ marginBottom: 14 }}>
                 <p style={{
-                  fontSize: 13, fontWeight: 700, color: "#1a1a1a",
-                  margin: "0 0 6px",
+                  fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                  margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.04em",
                 }}>
-                  {label}
+                  {label} ({items.length})
                 </p>
                 {items.slice(0, 5).map((t) => (
-                  <div key={t._id} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "4px 0",
-                  }}>
-                    <div style={{
-                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                      border: "1.5px solid #ccc", background: "#fff",
-                    }} />
-                    <span style={{
-                      fontSize: 13, color: "#333", flex: 1,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {t.title}
-                    </span>
-                    {t.memberName && (
-                      <Avatar name={t.memberName} size={20} />
-                    )}
-                  </div>
+                  <TaskRow
+                    key={t._id}
+                    task={t}
+                    showAssignee
+                    onClick={() => {
+                      router.push(`/tasks/${t._id}`);
+                    }}
+                  />
                 ))}
                 {items.length > 5 && (
-                  <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0" }}>
+                  <p style={{
+                    fontSize: 11, color: "var(--accent-light)", margin: "6px 0 0",
+                    cursor: "pointer", fontWeight: 600,
+                  }}>
                     +{items.length - 5} more
                   </p>
                 )}
@@ -290,50 +429,45 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
           {todosByStatus.completed.length > 0 && (
             <div style={{ marginBottom: 4 }}>
               <p style={{
-                fontSize: 13, fontWeight: 700, color: "#1a1a1a",
-                margin: "0 0 6px",
+                fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.04em",
               }}>
-                Completed
+                Completed ({todosByStatus.completed.length})
               </p>
               {todosByStatus.completed.slice(0, 3).map((t) => (
-                <div key={t._id} style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "4px 0",
-                }}>
-                  <div style={{
-                    width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                    border: "1.5px solid #22c55e", background: "#22c55e",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
-                      <path d="M2 5.5L4 7.5L8 3" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <span style={{
-                    fontSize: 13, color: "#999",
-                    textDecoration: "line-through",
-                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {t.title}
-                  </span>
-                </div>
+                <TaskRow
+                  key={t._id}
+                  task={t}
+                  isCompleted
+                  onClick={(e: any) => {
+                    e?.stopPropagation?.();
+                    router.push(`/tasks/${t._id}`);
+                  }}
+                />
               ))}
               {todosByStatus.completed.length > 3 && (
-                <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0" }}>
+                <p style={{
+                  fontSize: 11, color: "var(--accent-light)", margin: "6px 0 0",
+                  fontWeight: 600,
+                }}>
                   +{todosByStatus.completed.length - 3} more
                 </p>
               )}
             </div>
           )}
           {tasks.length === 0 && (
-            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No tasks yet</p>
+            <EmptyState text="No tasks yet. Create your first task to get started." icon="📋" />
           )}
         </Card>
 
         {/* ── Schedule ────────────────────────────────────────────────── */}
-        <Card title="Schedule">
+        <Card
+          title="Schedule"
+          count={schedule.length}
+          onClick={() => onSwitchView?.("calendar")}
+        >
           {schedule.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No upcoming deadlines</p>
+            <EmptyState text="No upcoming deadlines" icon="📅" />
           ) : (
             schedule.map((t, i) => {
               const due = t.dueDate ?? t.submissionDate ?? 0;
@@ -346,34 +480,33 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
                   {showDate && (
                     <div style={{
                       display: "flex", alignItems: "center", gap: 6,
-                      marginTop: i > 0 ? 12 : 0, marginBottom: 6,
+                      marginTop: i > 0 ? 12 : 0, marginBottom: 4,
                     }}>
                       <span style={{
                         fontSize: 11, fontWeight: 700,
-                        color: isOverdue ? "#ef4444" : "#666",
-                        letterSpacing: "0.02em",
+                        color: isOverdue ? "#ef4444" : "var(--text-muted)",
+                        letterSpacing: "0.02em", textTransform: "uppercase",
                       }}>
-                        {isOverdue ? "📅 " : "📅 "}{formatDate(due, locale)}
+                        {formatDate(due, locale)}
                       </span>
+                      {isOverdue && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: "#fff",
+                          background: "#ef4444", padding: "1px 5px",
+                          borderRadius: 4, textTransform: "uppercase",
+                        }}>
+                          overdue
+                        </span>
+                      )}
                     </div>
                   )}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "4px 0 4px 16px",
-                  }}>
-                    <div style={{
-                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                      border: `1.5px solid ${isOverdue ? "#ef4444" : "#ccc"}`,
-                      background: "#fff",
-                    }} />
-                    <span style={{
-                      fontSize: 13, flex: 1,
-                      color: isOverdue ? "#ef4444" : "#333",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {t.title}
-                    </span>
-                    {t.memberName && <Avatar name={t.memberName} size={20} />}
+                  <div style={{ paddingLeft: 8 }}>
+                    <TaskRow
+                      task={t}
+                      isOverdue={isOverdue}
+                      showAssignee
+                      onClick={() => router.push(`/tasks/${t._id}`)}
+                    />
                   </div>
                 </div>
               );
@@ -384,25 +517,25 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
         {/* ── Progress ────────────────────────────────────────────────── */}
         <Card title="Progress">
           {/* Big percentage */}
-          <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+          <div style={{ textAlign: "center", padding: "12px 0 20px" }}>
             <p style={{
-              fontSize: 48, fontWeight: 800, margin: 0, lineHeight: 1,
-              color: stats.pct === 100 ? "#22c55e" : "#1a1a1a",
+              fontSize: 52, fontWeight: 800, margin: 0, lineHeight: 1,
+              color: stats.pct === 100 ? "#22c55e" : "var(--text)",
             }}>
               {stats.pct}%
             </p>
-            <p style={{ fontSize: 12, color: "#999", margin: "4px 0 0" }}>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px 0 0" }}>
               {stats.completed}/{stats.total} tasks done
             </p>
           </div>
           {/* Progress bar */}
           <div style={{
-            height: 8, borderRadius: 99, background: "#e5e5e5", overflow: "hidden",
-            marginBottom: 16,
+            height: 8, borderRadius: 99, background: "var(--surface2)", overflow: "hidden",
+            marginBottom: 20,
           }}>
             <div style={{
               height: "100%", borderRadius: 99,
-              background: stats.pct === 100 ? "#22c55e" : "#6366f1",
+              background: stats.pct === 100 ? "#22c55e" : "var(--accent)",
               width: `${stats.pct}%`, transition: "width 0.5s ease",
             }} />
           </div>
@@ -411,44 +544,48 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
             { label: "Overdue", value: stats.overdue, color: "#ef4444", hide: stats.overdue === 0 },
             { label: "In progress", value: todosByStatus.in_progress.length, color: "#3b82f6" },
             { label: "Submitted", value: todosByStatus.submitted.length, color: "#f59e0b" },
-            { label: "To do", value: todosByStatus.draft.length, color: "#999" },
+            { label: "To do", value: todosByStatus.draft.length, color: "var(--text-muted)" },
           ].filter((s) => !s.hide).map(({ label, value, color }) => (
             <div key={label} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "5px 0",
+              padding: "6px 0",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: "#555" }}>{label}</span>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{value}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{value}</span>
             </div>
           ))}
         </Card>
 
-        {/* ── Activity (like Campfire) ────────────────────────────────── */}
-        <Card title="Activity">
+        {/* ── Activity ────────────────────────────────────────────────── */}
+        <Card
+          title="Activity"
+          count={activities.length}
+          onClick={() => onSwitchView?.("activity")}
+        >
           {recentActivity.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No activity yet</p>
+            <EmptyState text="No activity yet" icon="📢" />
           ) : (
             recentActivity.map((a: any) => (
               <div key={a._id} style={{
                 display: "flex", alignItems: "flex-start", gap: 10,
-                padding: "6px 0",
-                borderBottom: "1px solid #f0f0f0",
+                padding: "7px 0",
+                borderBottom: "1px solid var(--border)",
               }}>
                 <Avatar name={a.memberName ?? "?"} size={26} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
                       {a.memberName ?? "Unknown"}
                     </span>
-                    <span style={{ fontSize: 11, color: "#999" }}>
-                      {formatTime(a.createdAt, locale)}
+                    <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                      {formatRelative(a.createdAt)}
                     </span>
                   </div>
                   <p style={{
-                    fontSize: 12, color: "#555", margin: "2px 0 0", lineHeight: 1.4,
+                    fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {a.description}
@@ -459,76 +596,167 @@ export default function ProjectOverview({ project, tasks, members, projectId }: 
           )}
         </Card>
 
+        {/* ── Docs & Files ────────────────────────────────────────────── */}
+        <Card title="Docs & Files" count={attachments.length}>
+          {attachments.length === 0 ? (
+            <EmptyState text="No files uploaded yet. Attach files to tasks to see them here." icon="📁" />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {attachments.slice(0, 10).map((file: any) => {
+                const isImage = file.contentType?.startsWith("image/");
+                return (
+                  <a
+                    key={file._id}
+                    href={file.url ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 6px",
+                      borderRadius: 6,
+                      textDecoration: "none",
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface2)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {/* Thumbnail or icon */}
+                    {isImage && file.url ? (
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 6, overflow: "hidden",
+                        border: "1px solid var(--border)", flexShrink: 0,
+                        background: "var(--surface2)",
+                      }}>
+                        <img
+                          src={file.url}
+                          alt={file.fileName}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 6, flexShrink: 0,
+                        background: "var(--surface2)", border: "1px solid var(--border)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 18,
+                      }}>
+                        {fileIcon(file.contentType ?? "")}
+                      </div>
+                    )}
+                    {/* File info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: 13, fontWeight: 600, color: "var(--text)",
+                        margin: 0, overflow: "hidden", textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {file.fileName}
+                      </p>
+                      <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "1px 0 0" }}>
+                        {formatFileSize(file.size)} · {file.taskTitle}
+                      </p>
+                    </div>
+                  </a>
+                );
+              })}
+              {attachments.length > 10 && (
+                <p style={{
+                  fontSize: 11, color: "var(--accent-light)", margin: "8px 0 0",
+                  fontWeight: 600, textAlign: "center",
+                }}>
+                  +{attachments.length - 10} more files
+                </p>
+              )}
+            </div>
+          )}
+        </Card>
+
         {/* ── Team ────────────────────────────────────────────────────── */}
-        <Card title="Team">
-          {members.filter((m) => {
-            return tasks.some((t) => t.memberId === m._id);
-          }).map((m) => {
-            const mTasks = tasks.filter((t) => t.memberId === m._id);
-            const mDone = mTasks.filter((t) => t.status === "completed").length;
-            return (
-              <div key={m._id} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "6px 0",
-                borderBottom: "1px solid #f0f0f0",
-              }}>
-                <Avatar name={m.name} size={30} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    fontSize: 13, fontWeight: 600, color: "#1a1a1a",
-                    margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {m.name}
-                  </p>
-                  <p style={{ fontSize: 11, color: "#999", margin: "1px 0 0", textTransform: "capitalize" }}>
-                    {m.role}
-                  </p>
+        <Card title="Team" count={projectMembers.length}>
+          {projectMembers.length === 0 ? (
+            <EmptyState text="No team members assigned yet" icon="👥" />
+          ) : (
+            projectMembers.map((m: any) => {
+              const mTasks = tasks.filter((t) => t.memberId === m._id);
+              const mDone = mTasks.filter((t) => t.status === "completed").length;
+              const mPct = mTasks.length > 0 ? Math.round((mDone / mTasks.length) * 100) : 0;
+              return (
+                <div
+                  key={m._id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 4px",
+                    borderBottom: "1px solid var(--border)",
+                    cursor: "pointer",
+                    borderRadius: 6,
+                    transition: "background 0.1s",
+                  }}
+                  onClick={() => router.push(`/members/${m._id}`)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface2)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <Avatar name={m.name} size={32} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize: 13, fontWeight: 600, color: "var(--text)",
+                      margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {m.name}
+                    </p>
+                    <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "1px 0 0", textTransform: "capitalize" }}>
+                      {m.role}
+                    </p>
+                  </div>
+                  {/* Mini progress */}
+                  {mTasks.length > 0 && (
+                    <div style={{ textAlign: "right", flexShrink: 0, minWidth: 48 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
+                        {mDone}/{mTasks.length}
+                      </span>
+                      <div style={{
+                        width: 48, height: 4, borderRadius: 99,
+                        background: "var(--surface2)", overflow: "hidden", marginTop: 4,
+                      }}>
+                        <div style={{
+                          height: "100%", borderRadius: 99,
+                          background: mPct === 100 ? "#22c55e" : "var(--accent)",
+                          width: `${mPct}%`,
+                        }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                    {mDone}/{mTasks.length}
-                  </span>
-                  <p style={{ fontSize: 10, color: "#999", margin: 0 }}>done</p>
-                </div>
-              </div>
-            );
-          })}
-          {members.filter((m) => tasks.some((t) => t.memberId === m._id)).length === 0 && (
-            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>No tasks assigned yet</p>
+              );
+            })
           )}
         </Card>
 
         {/* ── North Star ──────────────────────────────────────────────── */}
         <Card title="North Star">
           {project.northStar ? (
-            <div style={{ padding: "8px 0" }}>
+            <div style={{ padding: "12px 0" }}>
               <p style={{
-                fontSize: 15, color: "#1a1a1a", margin: 0, lineHeight: 1.6,
+                fontSize: 15, color: "var(--text)", margin: 0, lineHeight: 1.6,
                 fontStyle: "italic", textAlign: "center",
               }}>
                 &ldquo;{project.northStar}&rdquo;
               </p>
             </div>
           ) : (
-            <p style={{
-              fontSize: 13, color: "#999", margin: 0, textAlign: "center",
-              padding: "16px 0",
-            }}>
-              No North Star set yet
-            </p>
+            <EmptyState text="Set a North Star to keep the team aligned on the big picture goal" icon="⭐" />
           )}
           {/* Quick timeline info */}
-          <div style={{ borderTop: "1px solid #f0f0f0", marginTop: 12, paddingTop: 12 }}>
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 12 }}>
             {[
               { label: "Start", value: project.startDate },
               { label: "Due", value: project.dueDate },
               { label: "Est. completion", value: project.estimatedCompletionDate },
             ].map(({ label, value }) => (
               <div key={label} style={{
-                display: "flex", justifyContent: "space-between", padding: "3px 0",
+                display: "flex", justifyContent: "space-between", padding: "4px 0",
               }}>
-                <span style={{ fontSize: 12, color: "#999" }}>{label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: value ? "#333" : "#ccc" }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: value ? "var(--text)" : "var(--text-dim)" }}>
                   {value ? formatDate(value, locale) : "—"}
                 </span>
               </div>

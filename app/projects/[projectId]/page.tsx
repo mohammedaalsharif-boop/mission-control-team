@@ -628,61 +628,69 @@ export default function ProjectPage() {
 
         {/* Toolbar */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 12, padding: "10px 24px",
+          display: "flex",
+          alignItems: "center", gap: 12, padding: "10px 24px",
           borderBottom: "1px solid var(--border)", flexShrink: 0,
         }}>
-          <button
-            onClick={() => {
-              if (view === "list") {
-                setListTrigger("draft");
-              } else {
-                setAddingCol("draft");
-                setForm(EMPTY_FORM);
-              }
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-              cursor: "pointer", border: "none", background: "var(--accent)", color: "#fff",
-            }}
-          >
-            <Plus size={14} /> {t.projectPage.newTask}
-          </button>
+          {/* New Task + Search + Filter — hidden in overview mode */}
+          {view !== "overview" && (
+            <>
+              <button
+                onClick={() => {
+                  if (view === "list") {
+                    setListTrigger("draft");
+                  } else {
+                    setAddingCol("draft");
+                    setForm(EMPTY_FORM);
+                  }
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: "pointer", border: "none", background: "var(--accent)", color: "#fff",
+                }}
+              >
+                <Plus size={14} /> {t.projectPage.newTask}
+              </button>
 
-          {/* Search */}
-          <div style={{ position: "relative" }}>
-            <Search size={13} style={{
-              position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)",
-              color: "var(--text-muted)", pointerEvents: "none",
-            }} />
-            <input
-              type="text" placeholder={t.projectPage.searchTasks}
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              style={{
-                padding: "5px 10px 5px 28px", width: 180, borderRadius: 8, fontSize: 12,
-                background: "var(--surface2)", border: "1px solid var(--border2)",
-                color: "var(--text)", outline: "none",
-              }}
-            />
-          </div>
+              {/* Search */}
+              <div style={{ position: "relative" }}>
+                <Search size={13} style={{
+                  position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)",
+                  color: "var(--text-muted)", pointerEvents: "none",
+                }} />
+                <input
+                  type="text" placeholder={t.projectPage.searchTasks}
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    padding: "5px 10px 5px 28px", width: 180, borderRadius: 8, fontSize: 12,
+                    background: "var(--surface2)", border: "1px solid var(--border2)",
+                    color: "var(--text)", outline: "none",
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Filter */}
-            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              {(["all", "mine"] as const).map((f) => (
-                <button key={f} onClick={() => setFilter(f)} style={{
-                  padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
-                  cursor: "pointer", textTransform: "capitalize",
-                  border:     filter === f ? "1px solid rgba(99,102,241,0.3)" : "1px solid transparent",
-                  background: filter === f ? "var(--accent-bg)" : "transparent",
-                  color:      filter === f ? "var(--accent-light)" : "var(--text-muted)",
-                }}>
-                  {f === "all" ? t.projectPage.all : t.projectPage.mine}
-                </button>
-              ))}
-            </div>
+            {/* Filter — hidden in overview mode */}
+            {view !== "overview" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                {(["all", "mine"] as const).map((f) => (
+                  <button key={f} onClick={() => setFilter(f)} style={{
+                    padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                    cursor: "pointer", textTransform: "capitalize",
+                    border:     filter === f ? "1px solid rgba(99,102,241,0.3)" : "1px solid transparent",
+                    background: filter === f ? "var(--accent-bg)" : "transparent",
+                    color:      filter === f ? "var(--accent-light)" : "var(--text-muted)",
+                  }}>
+                    {f === "all" ? t.projectPage.all : t.projectPage.mine}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {/* View toggle */}
+            {/* View toggle — always visible */}
             <div style={{
               display: "flex", alignItems: "center", gap: 2,
               background: "var(--surface2)", border: "1px solid var(--border2)",
@@ -715,12 +723,13 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* ── North Star banner ──────────────────────────────────────────── */}
+        {/* ── North Star banner — hidden in overview mode ──────────────── */}
         <div style={{
           flexShrink: 0,
           padding: "0 24px",
           borderBottom: "1px solid var(--border)",
           background: "var(--surface)",
+          display: view === "overview" ? "none" : "block",
         }}>
           {project.northStar ? (
             <div style={{
@@ -931,6 +940,7 @@ export default function ProjectPage() {
             tasks={tasks as any}
             members={members as any}
             projectId={projectId as string}
+            onSwitchView={(v: string) => setView(v as any)}
           />
         )}
 
