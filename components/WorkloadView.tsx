@@ -38,7 +38,9 @@ function TaskPill({ task }: { task: TeamTask }) {
   const due        = task.submissionDate;
   const msInDay    = 86_400_000;
   const isActive   = ACTIVE_STATUSES.has(task.status);
-  const isOverdue  = isActive && due && due.getTime() < now;
+  const dueEod = due ? new Date(due) : null;
+  if (dueEod) dueEod.setHours(23,59,59,999);
+  const isOverdue  = isActive && dueEod && dueEod.getTime() < now;
   const isDueSoon  = isActive && due && !isOverdue && due.getTime() - now <= msInDay;
 
   const s = STATUS_COLOR[task.status] ?? STATUS_COLOR.draft;

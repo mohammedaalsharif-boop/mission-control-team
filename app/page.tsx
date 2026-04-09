@@ -469,7 +469,9 @@ export default function Dashboard() {
                     <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0 }}>Nothing due</p>
                   ) : dueSoonTasks.map((dt) => {
                     const now       = Date.now();
-                    const isOverdue = (dt.dueDate ?? 0) < now;
+                    const dueEod = dt.dueDate ? new Date(dt.dueDate) : null;
+                    if (dueEod) dueEod.setHours(23,59,59,999);
+                    const isOverdue = dueEod ? dueEod.getTime() < now : false;
                     const daysUntil = Math.ceil(((dt.dueDate ?? 0) - now) / 86_400_000);
                     const dueLabel  = isOverdue    ? t.taskCard.overdue
                                     : daysUntil === 0 ? t.taskCard.dueToday

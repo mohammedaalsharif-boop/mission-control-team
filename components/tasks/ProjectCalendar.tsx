@@ -79,8 +79,10 @@ function TaskPill({ task, compact }: { task: CalTask; compact?: boolean }) {
   const s   = STATUS_STYLE[task.status] ?? STATUS_STYLE.draft;
   const dot = PRIORITY_DOT[task.priority ?? "medium"] ?? PRIORITY_DOT.medium;
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const submissionEod = new Date(task.submissionDate!);
+  submissionEod.setHours(23,59,59,999);
   const isOverdue = task.status !== "completed" &&
-    task.submissionDate! < Date.now() &&
+    submissionEod.getTime() < Date.now() &&
     !sameDay(new Date(task.submissionDate!), today);
 
   return (

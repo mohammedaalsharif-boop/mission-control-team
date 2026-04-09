@@ -599,7 +599,9 @@ export default function ProjectListCard({ project, spaceName }: ProjectListCardP
         {/* Estimated Completion Date */}
         {project.estimatedCompletionDate && (() => {
           const ecd = project.estimatedCompletionDate;
-          const isOverdue = ecd < Date.now() && pct < 100;
+          const ecdEod = new Date(ecd);
+          ecdEod.setHours(23,59,59,999);
+          const isOverdue = ecdEod.getTime() < Date.now() && pct < 100;
           const dateLocale = locale === "ar" ? "ar-SA" : "en-US";
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 5, paddingBottom: 8 }}>

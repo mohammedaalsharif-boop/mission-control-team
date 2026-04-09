@@ -25,8 +25,10 @@ function formatDate(ts?: number | Date, locale: string = "en-US"): string {
 
 function isOverdue(task: TeamTask): boolean {
   if (!task.dueDate || task.status === "completed") return false;
-  const due = task.dueDate instanceof Date ? task.dueDate.getTime() : (task.dueDate as unknown as number);
-  return due < Date.now();
+  const dueDate = task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate as unknown as number);
+  const dueEod = new Date(dueDate);
+  dueEod.setHours(23,59,59,999);
+  return dueEod.getTime() < Date.now();
 }
 
 function isDueSoon(task: TeamTask): boolean {

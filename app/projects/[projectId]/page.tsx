@@ -581,7 +581,9 @@ export default function ProjectPage() {
             {/* ECD — pushed to far right */}
             {(() => {
               const ecd = (project as any).estimatedCompletionDate as number | undefined;
-              const isOverdueProject = ecd && ecd < Date.now() && progress < 100;
+              const ecdEod = ecd ? new Date(ecd) : null;
+              if (ecdEod) ecdEod.setHours(23,59,59,999);
+              const isOverdueProject = ecdEod && ecdEod.getTime() < Date.now() && progress < 100;
               if (!ecd && !can("project.edit")) return null;
               return (
                 <>

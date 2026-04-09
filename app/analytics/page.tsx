@@ -497,8 +497,12 @@ function DrillDownDrawer({
     // Sort each group: overdue first, then by priority, then by creation date
     const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
     const sorter = (a: Doc<"tasks">, b: Doc<"tasks">) => {
-      const aOverdue = a.dueDate && a.dueDate < Date.now() ? 0 : 1;
-      const bOverdue = b.dueDate && b.dueDate < Date.now() ? 0 : 1;
+      const aEod = a.dueDate ? new Date(a.dueDate) : null;
+      if (aEod) aEod.setHours(23,59,59,999);
+      const aOverdue = aEod && aEod.getTime() < Date.now() ? 0 : 1;
+      const bEod = b.dueDate ? new Date(b.dueDate) : null;
+      if (bEod) bEod.setHours(23,59,59,999);
+      const bOverdue = bEod && bEod.getTime() < Date.now() ? 0 : 1;
       if (aOverdue !== bOverdue) return aOverdue - bOverdue;
       const aPri = priorityOrder[a.priority ?? ""] ?? 3;
       const bPri = priorityOrder[b.priority ?? ""] ?? 3;
@@ -1402,7 +1406,12 @@ export default function AnalyticsPage() {
 
   const openCompletionRate = () => {
     const incompleteTasks = tasks.filter((tk: Doc<"tasks">) => tk.status !== "completed");
-    const overdueTasks = incompleteTasks.filter((tk: Doc<"tasks">) => tk.dueDate && tk.dueDate < Date.now());
+    const overdueTasks = incompleteTasks.filter((tk: Doc<"tasks">) => {
+      if (!tk.dueDate) return false;
+      const dueEod = new Date(tk.dueDate);
+      dueEod.setHours(23,59,59,999);
+      return dueEod.getTime() < Date.now();
+    });
     openDrawer({
       title: t.analyticsPage.completionPct,
       subtitle: `${completed} of ${total} tasks completed`,

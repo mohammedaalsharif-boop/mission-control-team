@@ -35,12 +35,10 @@ function formatDate(ms: number, locale: string): string {
 }
 
 function isOverdue(task: Doc<"tasks">): boolean {
-  return !!(
-    task.submissionDate &&
-    task.submissionDate < Date.now() &&
-    task.status !== "completed" &&
-    task.status !== "submitted"
-  );
+  if (!task.submissionDate || task.status === "completed" || task.status === "submitted") return false;
+  const submissionEod = new Date(task.submissionDate);
+  submissionEod.setHours(23,59,59,999);
+  return submissionEod.getTime() < Date.now();
 }
 
 function isDueSoon(task: Doc<"tasks">): boolean {
