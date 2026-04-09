@@ -393,7 +393,9 @@ type UrgencyLevel = "critical" | "attention" | "on_track";
 
 function getTaskUrgency(tk: Doc<"tasks">): UrgencyLevel {
   const now = Date.now();
-  const isOverdue = tk.dueDate && tk.dueDate < now && tk.status !== "completed";
+  const _eod = tk.dueDate ? new Date(tk.dueDate) : null;
+  if (_eod) _eod.setHours(23, 59, 59, 999);
+  const isOverdue = _eod && _eod.getTime() < now && tk.status !== "completed";
   const isHigh = tk.priority === "high";
   const daysSinceCreated = Math.floor((now - tk.createdAt) / (1000 * 60 * 60 * 24));
   const isStale = daysSinceCreated > 14 && tk.status !== "completed" && tk.status !== "approved";
@@ -541,7 +543,9 @@ function DrillDownDrawer({
   // Render a single rich task card
   const renderTaskCard = (tk: Doc<"tasks">) => {
     const member = memberMap.get(tk.memberId);
-    const isOverdue = tk.dueDate && tk.dueDate < Date.now() && tk.status !== "completed";
+    const _eodTk = tk.dueDate ? new Date(tk.dueDate) : null;
+    if (_eodTk) _eodTk.setHours(23, 59, 59, 999);
+    const isOverdue = _eodTk && _eodTk.getTime() < Date.now() && tk.status !== "completed";
     const isExpanded = expandedTaskId === tk._id;
     const urgency = getTaskUrgency(tk);
     const accentColor = urgency === "critical" ? "#ef4444" : urgency === "attention" ? "#f59e0b" : "var(--border)";

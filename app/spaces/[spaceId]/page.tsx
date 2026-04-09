@@ -252,7 +252,9 @@ function StatusGroup({
 
           {/* Task rows */}
           {tasks.map((task) => {
-            const isOverdue = task.dueDate && task.dueDate < Date.now() && task.status !== "completed";
+            const _eod = task.dueDate ? new Date(task.dueDate) : null;
+            if (_eod) _eod.setHours(23, 59, 59, 999);
+            const isOverdue = _eod && _eod.getTime() < Date.now() && task.status !== "completed";
             const name = task.memberName || t.unknown;
             return (
               <div
@@ -941,7 +943,9 @@ function BoardColumn({
           </p>
         )}
         {tasks.map((task) => {
-          const isOverdue = task.dueDate && task.dueDate < Date.now() && task.status !== "completed";
+          const _eod2 = task.dueDate ? new Date(task.dueDate) : null;
+          if (_eod2) _eod2.setHours(23, 59, 59, 999);
+          const isOverdue = _eod2 && _eod2.getTime() < Date.now() && task.status !== "completed";
           const assignee = task.memberName || t.unknown;
           return (
             <div

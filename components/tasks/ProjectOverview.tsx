@@ -309,7 +309,11 @@ export default function ProjectOverview({ project, tasks, members, projectId, on
     const completed = tasks.filter((t) => t.status === "completed").length;
     const overdue = tasks.filter((t) => {
       const due = t.dueDate ?? t.submissionDate;
-      return due && due < now && t.status !== "completed";
+      if (!due || t.status === "completed") return false;
+      // Overdue only after the full due day has passed
+      const endOfDueDay = new Date(due);
+      endOfDueDay.setHours(23, 59, 59, 999);
+      return endOfDueDay.getTime() < now;
     }).length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, completed, overdue, pct };
@@ -471,7 +475,8 @@ export default function ProjectOverview({ project, tasks, members, projectId, on
           ) : (
             schedule.map((t, i) => {
               const due = t.dueDate ?? t.submissionDate ?? 0;
-              const isOverdue = due < now;
+              const eod = new Date(due); eod.setHours(23, 59, 59, 999);
+              const isOverdue = eod.getTime() < now;
               const prevDue = i > 0 ? (schedule[i - 1].dueDate ?? schedule[i - 1].submissionDate ?? 0) : 0;
               const showDate = i === 0 || formatDate(due, locale) !== formatDate(prevDue, locale);
 

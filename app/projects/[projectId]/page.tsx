@@ -408,7 +408,11 @@ export default function ProjectPage() {
   const total      = tasks.length;
   const completed  = tasks.filter((t) => t.status === "completed").length;
   const submitted  = tasks.filter((t) => t.status === "submitted").length;
-  const overdue    = tasks.filter((t) => t.dueDate && t.dueDate < Date.now() && t.status !== "completed").length;
+  const overdue    = tasks.filter((t) => {
+    if (!t.dueDate || t.status === "completed") return false;
+    const eod = new Date(t.dueDate); eod.setHours(23, 59, 59, 999);
+    return eod.getTime() < Date.now();
+  }).length;
   const progress   = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const handleAdd = async (colId: string, overrideForm?: { title: string; desc: string; priority: string; dueDate: string; tag: string }) => {

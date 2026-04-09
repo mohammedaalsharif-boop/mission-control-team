@@ -242,7 +242,9 @@ function StatusGroup({
 
           {/* Task rows */}
           {tasks.map((task) => {
-            const isOverdue = task.dueDate && task.dueDate < Date.now() && task.status !== "completed";
+            const _eod = task.dueDate ? new Date(task.dueDate) : null;
+            if (_eod) _eod.setHours(23, 59, 59, 999);
+            const isOverdue = _eod && _eod.getTime() < Date.now() && task.status !== "completed";
             return (
               <div
                 key={task._id}
