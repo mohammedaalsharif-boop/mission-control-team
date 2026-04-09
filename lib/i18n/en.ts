@@ -206,7 +206,7 @@ const en = {
   taskCard: {
     recurring: "Recurring",
     overdue: "Overdue",
-    dueToday: "Due today",
+    dueToday: "Today",
     due: "Due",
     submitForApproval: "Submit for approval",
   },

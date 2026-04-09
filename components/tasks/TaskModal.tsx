@@ -94,14 +94,15 @@ export default function TaskModal({
   }, [task.id]);
 
   const [editing,  setEditing]  = useState(false);
+  const initialSubmissionDate = task.submissionDate
+    ? new Date(task.submissionDate).toISOString().split("T")[0]
+    : "";
   const [editForm, setEditForm] = useState({
     title:          task.title,
     desc:           task.description ?? "",
     tag:            task.tag ?? "",
     priority:       task.priority ?? "medium",
-    submissionDate: task.submissionDate
-      ? new Date(task.submissionDate).toISOString().split("T")[0]
-      : "",
+    submissionDate: initialSubmissionDate,
   });
 
   const { orgId } = useAuth();
@@ -245,7 +246,7 @@ export default function TaskModal({
   const canMove   = isOwn && (task.status === "draft" || task.status === "in_progress" || task.status === "rejected");
   const canSubmit = isOwn && (task.status === "draft" || task.status === "in_progress" || task.status === "rejected");
   const canReview = isAdmin && task.status === "submitted";
-  const canEdit   = isOwn && (task.status === "draft" || task.status === "in_progress");
+  const canEdit   = (isOwn || isAdmin) && (task.status === "draft" || task.status === "in_progress");
 
   const EDIT_PRIORITY_OPTIONS = [
     { value: "high",   label: t.priority.high,   color: "var(--status-danger)" },
@@ -254,15 +255,19 @@ export default function TaskModal({
   ];
 
   const handleSave = async () => {
+    // Only send submissionDate if the user actually changed it, to avoid
+    // the date-string roundtrip producing a different timestamp and
+    // triggering the "Due date cannot be changed once set" backend check.
+    const dateChanged = editForm.submissionDate !== initialSubmissionDate;
     await updateTask({
       taskId:         task.id as Id<"tasks">,
       title:          editForm.title.trim() || undefined,
       description:    editForm.desc.trim() || undefined,
       tag:            editForm.tag.trim() || undefined,
       priority:       editForm.priority || undefined,
-      submissionDate: editForm.submissionDate
-        ? new Date(editForm.submissionDate).getTime()
-        : undefined,
+      ...(dateChanged && editForm.submissionDate
+        ? { submissionDate: new Date(editForm.submissionDate).getTime() }
+        : {}),
     });
     setEditing(false);
   };

@@ -519,8 +519,11 @@ export const updateTask = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
 
-    // Due date (submissionDate) is locked once set — cannot be changed
-    if (submissionDate !== undefined && task.submissionDate && submissionDate !== task.submissionDate) {
+    // Due date (submissionDate) is locked once set — cannot be changed.
+    // Compare at day-level to avoid false rejections from timestamp rounding.
+    const sameDay = (a: number, b: number) =>
+      new Date(a).toISOString().split("T")[0] === new Date(b).toISOString().split("T")[0];
+    if (submissionDate !== undefined && task.submissionDate && !sameDay(submissionDate, task.submissionDate)) {
       throw new Error("Due date cannot be changed once set.");
     }
 

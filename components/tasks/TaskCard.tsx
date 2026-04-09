@@ -313,9 +313,9 @@ export default function TaskCard({
               {isOverdue
                 ? `${t.taskCard.overdue} \u00b7 ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                 : isDueToday
-                  ? `${t.taskCard.dueToday} \u00b7 Today`
+                  ? t.taskCard.dueToday
                   : isDueSoon
-                    ? `${t.taskCard.dueToday} \u00b7 ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                    ? `${t.taskCard.due} ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                     : `${t.taskCard.due} ${task.submissionDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
               }
             </span>

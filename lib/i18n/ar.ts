@@ -207,7 +207,7 @@ const ar: Translations = {
   taskCard: {
     recurring: "متكرر",
     overdue: "متأخر",
-    dueToday: "مستحق اليوم",
+    dueToday: "اليوم",
     due: "مستحق",
     submitForApproval: "تقديم للموافقة",
   },

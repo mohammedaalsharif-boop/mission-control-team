@@ -989,10 +989,11 @@ export default function ProjectPage() {
         )}
 
         {/* Kanban board */}
-        <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: view === "kanban" ? "flex" : "none", flexDirection: "column" }}>
+        <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: view === "kanban" ? "flex" : "none", flexDirection: "column", minHeight: 0 }}>
           <div style={{
             display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 1, height: "100%", minWidth: 800,
+            gridTemplateRows: "1fr",
+            gap: 1, flex: 1, minHeight: 0, minWidth: 800,
           }}>
             {COLUMNS.map((col) => {
               const colItems = colTasks(col.id);
@@ -1006,9 +1007,10 @@ export default function ProjectPage() {
                   onDragLeave={() => setDragOver(null)}
                   onDrop={(e) => handleDrop(e, col.id)}
                   style={{
-                    display: "flex", flexDirection: "column",
+                    display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
                     borderRight: "1px solid var(--border)",
                     background: isDragTarget ? "rgba(99,102,241,0.04)" : "transparent",
+                    overflow: "hidden",
                     transition: "background 0.15s",
                   }}
                 >
@@ -1035,7 +1037,7 @@ export default function ProjectPage() {
                   </div>
 
                   {/* Tasks list */}
-                  <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 12px" }}>
+                  <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 8px 12px" }}>
                     {isAdding && (
                       <div style={{
                         background: "var(--surface)", border: "1px solid var(--border2)",

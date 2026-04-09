@@ -536,11 +536,12 @@ export default function Dashboard() {
         )}
 
         {/* Kanban board */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ display: view === "kanban" ? "flex" : "none", flexDirection: "column" }}>
+        <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ display: view === "kanban" ? "flex" : "none", flexDirection: "column", minHeight: 0 }}>
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 1, height: "100%", minWidth: 800,
+            gridTemplateRows: "1fr",
+            gap: 1, flex: 1, minHeight: 0, minWidth: 800,
           }}>
             {getColumns(t).map((col) => {
               const colItems     = colTasks(col.id);
@@ -555,7 +556,7 @@ export default function Dashboard() {
                   onDragLeave={() => setDragOver(null)}
                   onDrop={(e) => handleDrop(e, col.id)}
                   style={{
-                    display: "flex", flexDirection: "column", height: "100%",
+                    display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
                     borderRight: "1px solid var(--border)", overflow: "hidden",
                     background: isDragTarget ? "var(--accent-subtle)" : "transparent",
                     outline: isDragTarget ? "2px dashed rgba(99,102,241,0.5)" : "none",
