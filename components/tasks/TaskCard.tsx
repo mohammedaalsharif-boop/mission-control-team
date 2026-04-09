@@ -109,8 +109,11 @@ export default function TaskCard({
   const msInDay  = 86_400_000;
   const now      = Date.now();
   const dueDiff  = task.submissionDate ? task.submissionDate.getTime() - now : null;
-  const isOverdue = isActive && dueDiff !== null && dueDiff < 0;
-  const isDueSoon = isActive && dueDiff !== null && dueDiff >= 0 && dueDiff <= msInDay;
+  // Overdue only after the full due day has passed (end of day 23:59:59)
+  const dueEndOfDay = task.submissionDate ? new Date(task.submissionDate) : null;
+  if (dueEndOfDay) dueEndOfDay.setHours(23, 59, 59, 999);
+  const isOverdue = isActive && dueEndOfDay !== null && dueEndOfDay.getTime() < now;
+  const isDueSoon = isActive && dueDiff !== null && !isOverdue && dueDiff >= 0 && dueDiff <= msInDay;
 
   const initials = task.memberName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
