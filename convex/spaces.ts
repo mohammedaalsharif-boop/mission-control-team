@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAdmin, requireSameOrg, requirePermission } from "./helpers";
+import { requireAdmin, requireSameOrg, requirePermission, getCallerMember } from "./helpers";
 import { internal } from "./_generated/api";
 
 const now = () => Date.now();
@@ -12,18 +12,21 @@ export const list = query({
     includeArchived: v.optional(v.boolean()),
   },
   handler: async (ctx, { orgId, includeArchived }) => {
-    if (includeArchived) {
-      return ctx.db
-        .query("spaces")
-        .withIndex("by_org", (q) => q.eq("orgId", orgId))
-        .take(200);
+    let isPrivileged = false;
+    try {
+      const caller = await getCallerMember(ctx, orgId);
+      isPrivileged = caller.role === "admin" || caller.role === "manager";
+    } catch {
+      return [];
     }
-    // Stream and filter out archived spaces
+
     const result = [];
     for await (const s of ctx.db
       .query("spaces")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))) {
-      if (!s.archivedAt) result.push(s);
+      if (!includeArchived && s.archivedAt) continue;
+      if (!isPrivileged && s.isPrivate) continue;
+      result.push(s);
       if (result.length >= 200) break;
     }
     return result;

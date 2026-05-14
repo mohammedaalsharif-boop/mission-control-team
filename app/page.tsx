@@ -27,7 +27,7 @@ const getPriorityOptions = (t: any) => [
   { value: "low",    label: t.priority.low,    color: "var(--status-success)" },
 ];
 
-const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", submissionDate: "", visibility: "public", assigneeId: "", assigneeName: "" };
+const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", submissionDate: "", visibility: "public", assigneeId: "", assigneeName: "", projectId: "" };
 
 export default function Dashboard() {
   const { user, isLoading, orgId, can } = useAuth();
@@ -158,6 +158,7 @@ export default function Dashboard() {
     const assigneeName = (canAssignTask && form.assigneeName) ? form.assigneeName : user.name;
     const taskId = await createTask({
       orgId,
+      projectId:      form.projectId ? form.projectId as Id<"projects"> : undefined,
       title:          form.title.trim(),
       description:    form.desc.trim(),
       memberId:       assigneeId as Id<"members">,
@@ -212,7 +213,7 @@ export default function Dashboard() {
     description:     t.description,
     status:          t.status,
     memberId:        t.memberId,
-    memberName:      t.memberName,
+    memberName:      t.memberName || "?",
     priority:        t.priority ?? "medium",
     tag:             t.tag,
     dueDate:         t.dueDate        ? new Date(t.dueDate)        : undefined,
@@ -518,7 +519,7 @@ export default function Dashboard() {
             spaces={spaces}
             isAdmin={canApproveTask}
             currentUserId={user.memberId}
-            onAddTask={(projectId, statusId) => { setAddingCol("draft"); setForm(EMPTY_FORM); setView("kanban"); }}
+            onAddTask={(projectId, statusId) => { setAddingCol("draft"); setForm({ ...EMPTY_FORM, projectId: projectId || "" }); setView("kanban"); }}
             onSubmit={(id) => submitTask({ taskId: id as Id<"tasks"> })}
             onApprove={(id) => approveTask({ taskId: id as Id<"tasks"> })}
             onReject={(id, reason) => rejectTask({ taskId: id as Id<"tasks">, reason })}
@@ -672,6 +673,32 @@ export default function Dashboard() {
                             color: "var(--text)", outline: "none", width: "100%",
                           }}
                         />
+                        {/* Project picker */}
+                        {projects.length > 0 && (
+                          <select
+                            value={form.projectId}
+                            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+                            style={{
+                              background: "var(--surface3)", border: "1px solid var(--border2)",
+                              borderRadius: 6, padding: "6px 10px", fontSize: 12,
+                              color: form.projectId ? "var(--text)" : "var(--text-muted)",
+                              outline: "none", width: "100%", cursor: "pointer",
+                            }}
+                          >
+                            <option value="">No project</option>
+                            {spaces.map((space) => {
+                              const spaceProjects = projects.filter((p: any) => p.spaceId === space._id);
+                              if (spaceProjects.length === 0) return null;
+                              return (
+                                <optgroup key={space._id} label={space.name}>
+                                  {spaceProjects.map((p: any) => (
+                                    <option key={p._id} value={p._id}>{p.name}</option>
+                                  ))}
+                                </optgroup>
+                              );
+                            })}
+                          </select>
+                        )}
                         <input
                           type="date"
                           value={form.submissionDate}
