@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/components/AuthProvider";
 import { useLocale } from "@/components/LocaleProvider";
+import Sidebar from "@/components/Sidebar";
 
 /* ── Status colours ──────────────────────────────────────────────────────── */
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
@@ -59,7 +60,10 @@ export default function GoalsPage() {
   if (!orgId) return null;
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+      <Sidebar />
+      <main className="flex-1 overflow-auto" style={{ background: "var(--bg)" }}>
+      <div style={{ padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -213,6 +217,8 @@ export default function GoalsPage() {
           onUnlink={unlinkProject}
         />
       )}
+      </div>
+      </main>
     </div>
   );
 }
