@@ -617,6 +617,7 @@ export default function Dashboard() {
                                     visibility: "public",
                                     assigneeId: "",
                                     assigneeName: "",
+                                    projectId: form.projectId,
                                   })}
                                   style={{
                                     padding: "3px 8px", borderRadius: 5, fontSize: 10.5, fontWeight: 500,
