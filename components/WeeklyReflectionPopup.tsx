@@ -16,6 +16,7 @@ function getCurrentSunday(): string {
 }
 
 function isSunday(): boolean {
+  if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("reflection")) return true;
   return new Date().getDay() === 0;
 }
 
