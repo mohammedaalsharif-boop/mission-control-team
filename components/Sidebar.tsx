@@ -8,7 +8,7 @@ import {
   ChevronRight, Plus, Lock, Info, X, CheckCheck, Pencil,
   Star, Search, ArrowRight, Hash, Folder, Command,
   MoreHorizontal, Archive, ExternalLink, Link as LinkIcon,
-  CheckCircle, Building2, Target, Zap, Brain, Flame,
+  CheckCircle, Building2, Target, Zap, Brain, Flame, Menu,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -1094,6 +1094,7 @@ export default function Sidebar() {
   const [showNotifPanel,  setShowNotifPanel]  = useState(false);
   const [showSwitcher,    setShowSwitcher]    = useState(false);
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
+  const [mobileOpen,      setMobileOpen]      = useState(false);
 
   const favorites = useFavorites(user?.memberId);
 
@@ -1182,6 +1183,9 @@ export default function Sidebar() {
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [showOrgSwitcher]);
+
+  // Close mobile drawer on navigation
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   // Cmd+K / Ctrl+K global shortcut
   useEffect(() => {
@@ -1656,10 +1660,67 @@ export default function Sidebar() {
           from { opacity: 0; transform: translateY(-8px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
+
+        /* ── Mobile hamburger button (hidden on desktop) ── */
+        .sb-mobile-btn {
+          display: none;
+          position: fixed; top: 12px; left: 12px; z-index: 201;
+          width: 36px; height: 36px; border-radius: 8px;
+          background: var(--surface); border: 1px solid var(--border);
+          align-items: center; justify-content: center;
+          cursor: pointer; color: var(--text-muted);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          transition: background 0.1s, color 0.1s;
+        }
+        .sb-mobile-btn:hover { background: var(--surface2); color: var(--text); }
+
+        /* ── Mobile backdrop (hidden on desktop) ── */
+        .sb-mobile-backdrop {
+          display: none;
+          position: fixed; inset: 0; z-index: 199;
+          background: rgba(0,0,0,0.55);
+          backdrop-filter: blur(3px);
+          animation: sbFadeIn 0.2s ease;
+        }
+        @keyframes sbFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+
+        /* ── Mobile breakpoint ── */
+        @media (max-width: 768px) {
+          .sb {
+            position: fixed;
+            top: 0; left: 0;
+            transform: translateX(-100%);
+            transition: transform 0.25s cubic-bezier(0.16,1,0.3,1);
+            z-index: 200;
+            box-shadow: none;
+          }
+          .sb.sb-mobile-open {
+            transform: translateX(0);
+            box-shadow: 6px 0 40px rgba(0,0,0,0.35);
+          }
+          .sb-mobile-btn   { display: flex; }
+          .sb-mobile-backdrop { display: block; }
+        }
       ` }} />
 
+      {/* ── Mobile: backdrop + hamburger ── */}
+      {mobileOpen && (
+        <div className="sb-mobile-backdrop" onClick={() => setMobileOpen(false)} />
+      )}
+      <button
+        className="sb-mobile-btn"
+        onClick={() => setMobileOpen((v) => !v)}
+        title="Toggle menu"
+        aria-label="Toggle navigation"
+      >
+        {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+      </button>
+
       {/* ── Sidebar ── */}
-      <aside className="sb">
+      <aside className={`sb${mobileOpen ? " sb-mobile-open" : ""}`}>
 
         {/* Workspace header */}
         <div className="sb-header">
