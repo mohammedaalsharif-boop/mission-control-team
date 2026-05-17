@@ -20,7 +20,7 @@ import ProjectCalendar from "@/components/tasks/ProjectCalendar";
 import ProjectTimeline from "@/components/tasks/ProjectTimeline";
 import ProjectOverview from "@/components/tasks/ProjectOverview";
 
-const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", dueDate: "", visibility: "public" };
+const EMPTY_FORM = { title: "", desc: "", tag: "", priority: "medium", dueDate: "", visibility: "public", assigneeId: "", assigneeName: "" };
 
 function toTeamTask(tk: any): TeamTask {
   return {
@@ -29,7 +29,7 @@ function toTeamTask(tk: any): TeamTask {
     description:     tk.description,
     status:          tk.status,
     memberId:        tk.memberId,
-    memberName:      tk.memberName,
+    memberName:      tk.memberName || "?",
     priority:        tk.priority ?? "medium",
     tag:             tk.tag,
     submissionDate:  tk.submissionDate ? new Date(tk.submissionDate) : undefined,
@@ -375,6 +375,7 @@ export default function ProjectPage() {
   const [view,            setView]            = useState<"overview" | "kanban" | "list" | "calendar" | "activity">("kanban");
   const [addingCol,       setAddingCol]       = useState<string | null>(null);
   const [form,            setForm]            = useState(EMPTY_FORM);
+  const [formError,       setFormError]       = useState<string | null>(null);
   const [dragOver,        setDragOver]        = useState<string | null>(null);
   const [search,          setSearch]          = useState("");
   const [filter,          setFilter]          = useState<"all" | "mine">("all");
@@ -415,26 +416,38 @@ export default function ProjectPage() {
   }).length;
   const progress   = total > 0 ? Math.round((completed / total) * 100) : 0;
 
+  const canAssignTask = can("task.assign");
+
   const handleAdd = async (colId: string, overrideForm?: { title: string; desc: string; priority: string; dueDate: string; tag: string }) => {
     const f = overrideForm ?? form;
     if (!f.title.trim() || !orgId) return;
-    if (!f.dueDate) return; // Due date is mandatory
-    await createTask({
-      orgId,
-      projectId,
-      title:          f.title.trim(),
-      description:    f.desc.trim(),
-      memberId:       user.memberId as Id<"members">,
-      memberName:     user.name,
-      priority:       f.priority,
-      tag:            f.tag.trim() || undefined,
-      dueDate:        new Date(f.dueDate).getTime(),
-      submissionDate: new Date(f.dueDate).getTime(),
-      visibility:     "public",
-    });
-    if (!overrideForm) {
-      setForm(EMPTY_FORM);
-      setAddingCol(null);
+    if (!f.dueDate) {
+      setFormError("Due date is required");
+      return;
+    }
+    setFormError(null);
+    const assigneeId   = (canAssignTask && form.assigneeId)   ? form.assigneeId   : user.memberId;
+    const assigneeName = (canAssignTask && form.assigneeName) ? form.assigneeName : user.name;
+    try {
+      await createTask({
+        orgId,
+        projectId,
+        title:          f.title.trim(),
+        description:    f.desc.trim(),
+        memberId:       assigneeId as Id<"members">,
+        memberName:     assigneeName,
+        priority:       f.priority,
+        tag:            f.tag.trim() || undefined,
+        dueDate:        new Date(f.dueDate).getTime(),
+        submissionDate: new Date(f.dueDate).getTime(),
+        visibility:     "public",
+      });
+      if (!overrideForm) {
+        setForm(EMPTY_FORM);
+        setAddingCol(null);
+      }
+    } catch (err: any) {
+      setFormError(err?.message ?? "Failed to create task. Please try again.");
     }
   };
 
@@ -648,6 +661,7 @@ export default function ProjectPage() {
                   } else {
                     setAddingCol("draft");
                     setForm(EMPTY_FORM);
+                    setFormError(null);
                   }
                 }}
                 style={{
@@ -1029,7 +1043,7 @@ export default function ProjectPage() {
                       {colItems.length}
                     </span>
                     <button
-                      onClick={() => setAddingCol(isAdding ? null : col.id)}
+                      onClick={() => { setAddingCol(isAdding ? null : col.id); setFormError(null); }}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2, marginLeft: 2 }}
                     >
                       <Plus size={14} strokeWidth={1.8} />
@@ -1048,7 +1062,7 @@ export default function ProjectPage() {
                           autoFocus placeholder={t.projectPage.taskTitle}
                           value={form.title}
                           onChange={(e) => setForm({ ...form, title: e.target.value })}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(col.id); if (e.key === "Escape") setAddingCol(null); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(col.id); if (e.key === "Escape") { setAddingCol(null); setFormError(null); } }}
                           style={{
                             background: "var(--surface2)", border: "1px solid var(--border2)",
                             borderRadius: 7, padding: "7px 10px", fontSize: 13,
@@ -1093,12 +1107,41 @@ export default function ProjectPage() {
                             );
                           })}
                         </div>
-                        <input
-                          type="date"
-                          value={form.dueDate}
-                          onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                          style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 7, padding: "6px 8px", fontSize: 11, color: "var(--text)", outline: "none", width: "100%", boxSizing: "border-box" }}
-                        />
+                        <div>
+                          <input
+                            type="date"
+                            value={form.dueDate}
+                            onChange={(e) => { setForm({ ...form, dueDate: e.target.value }); setFormError(null); }}
+                            style={{ background: "var(--surface2)", border: `1px solid ${formError ? "var(--status-danger)" : "var(--border2)"}`, borderRadius: 7, padding: "6px 8px", fontSize: 11, color: "var(--text)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                          />
+                          {formError && (
+                            <p style={{ color: "var(--status-danger)", fontSize: 11, margin: "4px 0 0", fontWeight: 500 }}>
+                              {formError}
+                            </p>
+                          )}
+                        </div>
+                        {/* Assign to (admin/manager only) */}
+                        {canAssignTask && members.length > 0 && (
+                          <select
+                            value={form.assigneeId || user.memberId}
+                            onChange={(e) => {
+                              const m = members.find((m) => m._id === e.target.value);
+                              setForm({ ...form, assigneeId: e.target.value, assigneeName: m?.name ?? "" });
+                            }}
+                            style={{
+                              background: "var(--surface2)", border: "1px solid var(--border2)",
+                              borderRadius: 7, padding: "6px 10px", fontSize: 12,
+                              color: "var(--text)", outline: "none", width: "100%",
+                              boxSizing: "border-box", cursor: "pointer",
+                            }}
+                          >
+                            {members.map((m) => (
+                              <option key={m._id} value={m._id}>
+                                {m._id === user.memberId ? `${m.name} (me)` : m.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
                             onClick={() => handleAdd(col.id)}
@@ -1110,7 +1153,7 @@ export default function ProjectPage() {
                             {t.projectPage.addTask}
                           </button>
                           <button
-                            onClick={() => setAddingCol(null)}
+                            onClick={() => { setAddingCol(null); setFormError(null); }}
                             style={{
                               padding: "7px 10px", borderRadius: 7, background: "var(--surface2)",
                               border: "1px solid var(--border2)", cursor: "pointer", color: "var(--text-muted)",

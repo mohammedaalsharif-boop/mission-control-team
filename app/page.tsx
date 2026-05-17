@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [search,     setSearch]     = useState("");
   const [addingCol,  setAddingCol]  = useState<string | null>(null);
   const [form,       setForm]       = useState(EMPTY_FORM);
+  const [formError,  setFormError]  = useState<string | null>(null);
   const [dragOver,   setDragOver]   = useState<string | null>(null);
   const [prevSeen,   setPrevSeen]   = useState<number | null>(null);
   const [resumeOpen, setResumeOpen] = useState(true);
@@ -153,25 +154,32 @@ export default function Dashboard() {
 
   const handleAdd = async (colId: string) => {
     if (!form.title.trim() || !orgId) return;
-    if (!form.submissionDate) return; // Due date is mandatory
+    if (!form.submissionDate) {
+      setFormError("Due date is required");
+      return;
+    }
+    setFormError(null);
     const assigneeId   = (canAssignTask && form.assigneeId)   ? form.assigneeId   : user.memberId;
     const assigneeName = (canAssignTask && form.assigneeName) ? form.assigneeName : user.name;
-    const taskId = await createTask({
-      orgId,
-      projectId:      form.projectId ? form.projectId as Id<"projects"> : undefined,
-      title:          form.title.trim(),
-      description:    form.desc.trim(),
-      memberId:       assigneeId as Id<"members">,
-      memberName:     assigneeName,
-      priority:       form.priority,
-      tag:            form.tag.trim() || undefined,
-      submissionDate: new Date(form.submissionDate).getTime(),
-      visibility:     form.visibility,
-    });
-    setForm(EMPTY_FORM);
-    setAddingCol(null);
-    // Show bottleneck prompt for the newly created task
-    setBottleneckTask({ id: taskId, col: colId });
+    try {
+      const taskId = await createTask({
+        orgId,
+        projectId:      form.projectId ? form.projectId as Id<"projects"> : undefined,
+        title:          form.title.trim(),
+        description:    form.desc.trim(),
+        memberId:       assigneeId as Id<"members">,
+        memberName:     assigneeName,
+        priority:       form.priority,
+        tag:            form.tag.trim() || undefined,
+        submissionDate: new Date(form.submissionDate).getTime(),
+        visibility:     form.visibility,
+      });
+      setForm(EMPTY_FORM);
+      setAddingCol(null);
+      setBottleneckTask({ id: taskId, col: colId });
+    } catch (err: any) {
+      setFormError(err?.message ?? "Failed to create task. Please try again.");
+    }
   };
 
   const handleSaveTemplate = async () => {
@@ -275,7 +283,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3 px-6 py-3 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border)" }}>
           <button
-            onClick={() => { setAddingCol("draft"); setForm(EMPTY_FORM); }}
+            onClick={() => { setAddingCol("draft"); setForm(EMPTY_FORM); setFormError(null); }}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 8, fontSize: 13,
@@ -575,7 +583,7 @@ export default function Dashboard() {
                     </div>
                     {canAddHere && (
                       <button
-                        onClick={() => { setAddingCol(isAdding ? null : col.id); setForm(EMPTY_FORM); }}
+                        onClick={() => { setAddingCol(isAdding ? null : col.id); setForm(EMPTY_FORM); setFormError(null); }}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex" }}
                       >
                         {isAdding ? <X size={13} /> : <Plus size={13} />}
@@ -700,17 +708,23 @@ export default function Dashboard() {
                             })}
                           </select>
                         )}
-                        <input
-                          type="date"
-                          value={form.submissionDate}
-                          onChange={(e) => setForm({ ...form, submissionDate: e.target.value })}
-                          placeholder={`${t.taskModal.dueDate} (optional)`}
-                          style={{
-                            background: "var(--surface3)", border: "1px solid var(--border2)",
-                            borderRadius: 6, padding: "6px 10px", fontSize: 12,
-                            color: "var(--text)", outline: "none", width: "100%",
-                          }}
-                        />
+                        <div>
+                          <input
+                            type="date"
+                            value={form.submissionDate}
+                            onChange={(e) => { setForm({ ...form, submissionDate: e.target.value }); setFormError(null); }}
+                            style={{
+                              background: "var(--surface3)", border: `1px solid ${formError ? "var(--status-danger)" : "var(--border2)"}`,
+                              borderRadius: 6, padding: "6px 10px", fontSize: 12,
+                              color: "var(--text)", outline: "none", width: "100%", boxSizing: "border-box",
+                            }}
+                          />
+                          {formError && (
+                            <p style={{ color: "var(--status-danger)", fontSize: 11, margin: "4px 0 0", fontWeight: 500 }}>
+                              {formError}
+                            </p>
+                          )}
+                        </div>
 
                         {/* Priority */}
                         <div style={{ display: "flex", gap: 6 }}>
@@ -798,7 +812,7 @@ export default function Dashboard() {
                           >
                             <Bookmark size={11} /> Save template
                           </button>
-                          <button onClick={() => setAddingCol(null)} style={{
+                          <button onClick={() => { setAddingCol(null); setFormError(null); }} style={{
                             padding: "5px 10px", borderRadius: 6, fontSize: 12,
                             background: "var(--surface3)", color: "var(--text-muted)",
                             border: "1px solid var(--border2)", cursor: "pointer",
