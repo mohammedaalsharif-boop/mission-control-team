@@ -81,7 +81,7 @@ export const listAllTasksForViewer = query({
       .query("projectMembers")
       .withIndex("by_member", (q) => q.eq("memberId", viewerId))
       .collect();
-    const accessibleProjects = new Set(memberships.map((m) => m.projectId));
+    const explicitProjects = new Set(memberships.map((m) => m.projectId));
 
     const grants = await ctx.db
       .query("taskAccess")
@@ -89,17 +89,28 @@ export const listAllTasksForViewer = query({
       .collect();
     const grantedTaskIds = new Set(grants.map((g) => g.taskId));
 
+    // Build set of private project IDs — members need explicit access for those
+    const allProjects = await ctx.db
+      .query("projects")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const privateProjectIds = new Set(
+      allProjects.filter((p) => p.isPrivate).map((p) => p._id)
+    );
+
     // Stream through tasks and collect only visible ones, up to 500
     const result = [];
     for await (const t of ctx.db
       .query("tasks")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .order("desc")) {
+      const projectVisible = !t.projectId ||
+        !privateProjectIds.has(t.projectId) ||
+        explicitProjects.has(t.projectId);
       if (
         grantedTaskIds.has(t._id) ||
         t.memberId === viewerId ||
-        ((!t.projectId || accessibleProjects.has(t.projectId)) &&
-          (!t.visibility || t.visibility === "public"))
+        (projectVisible && (!t.visibility || t.visibility === "public"))
       ) {
         result.push(t);
       }
@@ -598,7 +609,12 @@ export const deleteTask = mutation({
     if (!task) throw new Error("Task not found");
     if (!task.orgId) throw new Error("Task has no organization");
 
-    await requirePermission(ctx, task.orgId, "task.delete");
+    const member = await getCallerMember(ctx, task.orgId);
+    const isAssignee = task.memberId === member._id;
+
+    if (!isAssignee) {
+      await requirePermission(ctx, task.orgId, "task.delete");
+    }
 
     await ctx.db.delete(taskId);
     return taskId;
